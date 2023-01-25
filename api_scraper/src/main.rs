@@ -1,6 +1,7 @@
 use sqlx::mysql::MySqlPoolOptions;
 
 mod maps;
+mod modes;
 mod output;
 
 use {
@@ -87,7 +88,8 @@ async fn main() -> Eyre<()> {
 				.await?;
 		},
 		Endpoint::Modes => {
-			todo!();
+			modes::fetch_modes(args.output_method, args.output_path, args.table_name, connection)
+				.await?;
 		},
 		Endpoint::Players { start_id, offset, limit } => {
 			todo!();
