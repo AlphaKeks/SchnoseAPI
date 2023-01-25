@@ -93,13 +93,14 @@ async fn main() -> Eyre<()> {
 			modes::fetch_modes(args.output_method, args.output_path, args.table_name, connection)
 				.await?;
 		},
-		Endpoint::Players { start_offset, chunk_size, limit } => {
+		Endpoint::Players { start_offset, chunk_size, backwards, limit } => {
 			let delay = args.delay.unwrap_or(1000);
 			let chunk_size = chunk_size.unwrap_or(1);
 
 			players::fetch_players(
 				start_offset,
 				chunk_size,
+				backwards.unwrap_or(false),
 				limit.unwrap_or(chunk_size),
 				delay,
 				args.output_method,
@@ -141,8 +142,17 @@ struct Config {
 enum Endpoint {
 	Maps,
 	Modes,
-	Players { start_offset: i32, chunk_size: Option<u32>, limit: Option<u32> },
-	Records { start_id: isize, limit: Option<u32>, backwards: Option<bool> },
+	Players {
+		start_offset: i32,
+		chunk_size: Option<u32>,
+		backwards: Option<bool>,
+		limit: Option<u32>,
+	},
+	Records {
+		start_id: isize,
+		limit: Option<u32>,
+		backwards: Option<bool>,
+	},
 	Servers,
 }
 

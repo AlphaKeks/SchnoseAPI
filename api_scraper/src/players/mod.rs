@@ -14,6 +14,7 @@ use {
 pub(crate) async fn fetch_players(
 	start_offset: i32,
 	chunk_size: u32,
+	backwards: bool,
 	limit: u32,
 	delay: u64,
 	output_method: OutputMethod,
@@ -38,8 +39,13 @@ pub(crate) async fn fetch_players(
 
 			info!("Starting the requests...");
 			for i in 1.. {
-				let player_req = GlobalAPI::get_players(Some(offset), Some(chunk_size), &client)
-					.await?
+				let Ok(player_req) = GlobalAPI::get_players(Some(offset), Some(chunk_size), &client).await else {
+					info!("No new players...");
+					std::thread::sleep(delay);
+					continue;
+				};
+
+				let player_req = player_req
 					.into_iter()
 					.filter(|player| player.name.ne("Bad Steamid64"))
 					.collect::<Vec<_>>();
@@ -61,7 +67,11 @@ pub(crate) async fn fetch_players(
 					break;
 				}
 
-				offset -= chunk_size as i32;
+				if backwards {
+					offset += chunk_size as i32;
+				} else {
+					offset -= chunk_size as i32;
+				}
 				std::thread::sleep(delay);
 			}
 		},

@@ -34,6 +34,7 @@ pub(crate) async fn fetch_records(
 
 			let mut total = 0;
 			let mut i = start_id;
+			info!("Starting the requests...");
 			loop {
 				let Ok(record) = GlobalAPI::get_record(i as i32, &client).await else {
 					info!("No new records...");
