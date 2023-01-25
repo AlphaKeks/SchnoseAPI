@@ -3,6 +3,7 @@ use sqlx::mysql::MySqlPoolOptions;
 mod maps;
 mod modes;
 mod output;
+mod players;
 
 use {
 	clap::{Parser, Subcommand, ValueEnum},
@@ -19,7 +20,7 @@ struct Args {
 
 	/// Delay between each request in milliseconds. Defaults to `1000`.
 	#[arg(long)]
-	delay: Option<usize>,
+	delay: Option<u64>,
 
 	/// Output method. Defaults to `json`.
 	#[arg(long)]
@@ -91,8 +92,21 @@ async fn main() -> Eyre<()> {
 			modes::fetch_modes(args.output_method, args.output_path, args.table_name, connection)
 				.await?;
 		},
-		Endpoint::Players { start_id, offset, limit } => {
-			todo!();
+		Endpoint::Players { start_offset, chunk_size, limit } => {
+			let delay = args.delay.unwrap_or(1000);
+			let chunk_size = chunk_size.unwrap_or(1);
+
+			players::fetch_players(
+				start_offset,
+				chunk_size,
+				limit.unwrap_or(chunk_size),
+				delay,
+				args.output_method,
+				args.output_path,
+				args.table_name,
+				connection,
+			)
+			.await?;
 		},
 		Endpoint::Records { start_id, limit } => {
 			todo!();
@@ -114,7 +128,7 @@ struct Config {
 enum Endpoint {
 	Maps,
 	Modes,
-	Players { start_id: usize, offset: usize, limit: Option<usize> },
+	Players { start_offset: i32, chunk_size: Option<u32>, limit: Option<u32> },
 	Records { start_id: usize, limit: Option<usize> },
 	Servers,
 }
