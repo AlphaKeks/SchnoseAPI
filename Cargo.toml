@@ -1,0 +1,30 @@
+[workspace]
+members = ["api_scraper"]
+
+[workspace.dependencies]
+# error handling
+color-eyre = "0.6"
+
+# logging
+log = "0.4"
+env_logger = "0.10"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# parsing
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.5"
+
+# time
+chrono = "0.4"
+
+# GOKZ
+gokz_rs = "0.14"
+
+# async runtime
+tokio = { version = "1", features = ["full"] }
+
+# SQL
+sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "mysql"] }
