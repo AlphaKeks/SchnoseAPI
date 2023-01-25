@@ -4,6 +4,7 @@ mod maps;
 mod modes;
 mod output;
 mod players;
+mod records;
 
 use {
 	clap::{Parser, Subcommand, ValueEnum},
@@ -108,8 +109,20 @@ async fn main() -> Eyre<()> {
 			)
 			.await?;
 		},
-		Endpoint::Records { start_id, limit } => {
-			todo!();
+		Endpoint::Records { start_id, limit, backwards } => {
+			let delay = args.delay.unwrap_or(1000);
+
+			records::fetch_records(
+				start_id,
+				backwards.unwrap_or(false),
+				limit.unwrap_or(1),
+				delay,
+				args.output_method,
+				args.output_path,
+				args.table_name,
+				connection,
+			)
+			.await?;
 		},
 		Endpoint::Servers => {
 			todo!();
@@ -129,7 +142,7 @@ enum Endpoint {
 	Maps,
 	Modes,
 	Players { start_offset: i32, chunk_size: Option<u32>, limit: Option<u32> },
-	Records { start_id: usize, limit: Option<usize> },
+	Records { start_id: isize, limit: Option<u32>, backwards: Option<bool> },
 	Servers,
 }
 

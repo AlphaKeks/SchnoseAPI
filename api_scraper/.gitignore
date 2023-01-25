@@ -2,3 +2,4 @@ config.toml
 maps.json
 modes.json
 players.json
+records.json
