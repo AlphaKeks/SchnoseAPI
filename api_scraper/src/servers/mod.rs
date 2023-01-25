@@ -25,8 +25,7 @@ pub(crate) async fn fetch_servers(
 
 	match output_method {
 		OutputMethod::Json => {
-			let output_path =
-				output_path.expect("`output_path` is a required flag for this method.");
+			let output_path = output_path.unwrap_or_else(|| String::from("./servers.json"));
 
 			let mut json = serde_json::to_vec(&servers)?;
 			json.push(b'\n');

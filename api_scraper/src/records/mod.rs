@@ -26,8 +26,7 @@ pub(crate) async fn fetch_records(
 
 	match output_method {
 		OutputMethod::Json => {
-			let output_path =
-				output_path.expect("`output_path` is a required flag for this method.");
+			let output_path = output_path.unwrap_or_else(|| String::from("./records.json"));
 			let output_file = get_file(&output_path)?;
 			let mut buf_writer = BufWriter::new(output_file);
 			write_to_file(&mut buf_writer, &[b'['], &output_path)?;
