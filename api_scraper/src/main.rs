@@ -5,6 +5,7 @@ mod modes;
 mod output;
 mod players;
 mod records;
+mod servers;
 
 use {
 	clap::{Parser, Subcommand, ValueEnum},
@@ -126,7 +127,13 @@ async fn main() -> Eyre<()> {
 			.await?;
 		},
 		Endpoint::Servers => {
-			todo!();
+			servers::fetch_servers(
+				args.output_method,
+				args.output_path,
+				args.table_name,
+				connection,
+			)
+			.await?;
 		},
 	}
 
