@@ -1,5 +1,3 @@
-use sqlx::mysql::MySqlPoolOptions;
-
 mod maps;
 mod modes;
 mod output;
@@ -10,43 +8,31 @@ mod servers;
 use {
 	clap::{Parser, Subcommand, ValueEnum},
 	color_eyre::Result as Eyre,
-	serde::{Deserialize, Serialize},
 };
 
 /// CLI tool to continuously fetch data from the GlobalAPI
 #[derive(Debug, Parser)]
+
 struct Args {
-	/// Which endpoint to target
-	#[command(subcommand)]
-	endpoint: Endpoint,
-
-	/// Delay between each request in milliseconds. Defaults to `1000`.
-	#[arg(long)]
-	delay: Option<u64>,
-
-	/// Output method. Defaults to `json`.
-	#[arg(long)]
-	output_method: OutputMethod,
-
-	/// Path for the output if `json` was specified as the output method.
-	#[arg(long)]
+	/// Path for the output json file.
+	#[arg(short, long)]
 	output_path: Option<String>,
 
-	/// MySQL table name if `mysql` was specified as the output method.
-	#[arg(long)]
-	table_name: Option<String>,
-
-	/// `config.toml` file path with the MySQL connection string
+	/// Delay between each request in milliseconds. Defaults to `1000`.
 	#[arg(short, long)]
-	config_path: Option<String>,
+	delay: Option<u64>,
 
 	/// Don't print any output. The `debug` flag overrides this flag.
 	#[arg(short, long)]
 	quiet: bool,
 
 	/// Print debug information.
-	#[arg(short, long)]
+	#[arg(long)]
 	debug: bool,
+
+	/// Which endpoint to target.
+	#[command(subcommand)]
+	endpoint: Endpoint,
 }
 
 #[tokio::main]
@@ -66,33 +52,12 @@ async fn main() -> Eyre<()> {
 
 	env_logger::init();
 
-	let connection = match args.output_method {
-		OutputMethod::Json => None,
-		OutputMethod::MySQL => {
-			let config_path = args.config_path.unwrap_or_else(|| String::from("./config.toml"));
-			let config_file = std::fs::read_to_string(&config_path)
-				.unwrap_or_else(|_| panic!("Couldn't find config file at `{}`.", config_path));
-			let config: Config =
-				toml::from_str(&config_file).expect("Failed to parse `config.toml`");
-
-			Some(
-				MySqlPoolOptions::new()
-					.max_connections(50)
-					.connect(&config.database_url)
-					.await?,
-			)
-		},
-	};
-
-	#[allow(unused)]
 	match args.endpoint {
 		Endpoint::Maps => {
-			maps::fetch_maps(args.output_method, args.output_path, args.table_name, connection)
-				.await?;
+			maps::fetch_maps(args.output_path).await?;
 		},
 		Endpoint::Modes => {
-			modes::fetch_modes(args.output_method, args.output_path, args.table_name, connection)
-				.await?;
+			modes::fetch_modes(args.output_path).await?;
 		},
 		Endpoint::Players { start_offset, chunk_size, backwards, limit } => {
 			let delay = args.delay.unwrap_or(1000);
@@ -104,10 +69,7 @@ async fn main() -> Eyre<()> {
 				backwards.unwrap_or(false),
 				limit.unwrap_or(chunk_size),
 				delay,
-				args.output_method,
 				args.output_path,
-				args.table_name,
-				connection,
 			)
 			.await?;
 		},
@@ -119,47 +81,38 @@ async fn main() -> Eyre<()> {
 				backwards.unwrap_or(false),
 				limit.unwrap_or(1),
 				delay,
-				args.output_method,
 				args.output_path,
-				args.table_name,
-				connection,
 			)
 			.await?;
 		},
 		Endpoint::Servers => {
-			servers::fetch_servers(
-				args.output_method,
-				args.output_path,
-				args.table_name,
-				connection,
-			)
-			.await?;
+			servers::fetch_servers(args.output_path).await?;
 		},
 	}
 
 	Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Config {
-	database_url: String,
-}
-
 #[derive(Debug, Clone, Copy, Subcommand)]
 enum Endpoint {
+	/// Fetch maps from the GlobalAPI.
 	Maps,
+	/// Fetch modes from the GlobalAPI.
 	Modes,
+	/// Fetch players from the GlobalAPI.
 	Players {
+		/// The offset at which to start scraping players
 		start_offset: i32,
+		/// How many players you want per request. The maximum is 500.
 		chunk_size: Option<u32>,
+		/// Whether to scrape backwards or not.
 		backwards: Option<bool>,
+		/// How many players to fetch before stopping automatically.
 		limit: Option<u32>,
 	},
-	Records {
-		start_id: isize,
-		limit: Option<u32>,
-		backwards: Option<bool>,
-	},
+	/// Fetch records from the GlobalAPI.
+	Records { start_id: isize, limit: Option<u32>, backwards: Option<bool> },
+	/// Fetch servers from the GlobalAPI.
 	Servers,
 }
 

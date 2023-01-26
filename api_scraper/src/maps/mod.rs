@@ -1,22 +1,13 @@
 use {
-	crate::{
-		output::{get_file, write_to_file},
-		OutputMethod,
-	},
+	crate::output::{get_file, write_to_file},
 	color_eyre::Result as Eyre,
 	gokz_rs::{GlobalAPI, KZGO},
 	log::{debug, info},
 	serde::{Deserialize, Serialize},
-	sqlx::{MySql, Pool},
 	std::io::BufWriter,
 };
 
-pub(crate) async fn fetch_maps(
-	output_method: OutputMethod,
-	output_path: Option<String>,
-	_table_name: Option<String>,
-	_connection: Option<Pool<MySql>>,
-) -> Eyre<()> {
+pub(crate) async fn fetch_maps(output_path: Option<String>) -> Eyre<()> {
 	let client = gokz_rs::Client::new();
 
 	let mut global_api_maps = GlobalAPI::get_maps(true, Some(9999), &client).await?;
@@ -57,20 +48,13 @@ pub(crate) async fn fetch_maps(
 		})
 		.collect();
 
-	match output_method {
-		OutputMethod::Json => {
-			let output_path = output_path.unwrap_or_else(|| String::from("./maps.json"));
+	let output_path = output_path.unwrap_or_else(|| String::from("./maps.json"));
 
-			let mut json = serde_json::to_vec(&maps)?;
-			json.push(b'\n');
-			let output_file = get_file(&output_path)?;
-			let mut buf_writer = BufWriter::new(output_file);
-			write_to_file(&mut buf_writer, &json, &output_path)?;
-		},
-		OutputMethod::MySQL => {
-			todo!();
-		},
-	}
+	let mut json = serde_json::to_vec(&maps)?;
+	json.push(b'\n');
+	let output_file = get_file(&output_path)?;
+	let mut buf_writer = BufWriter::new(output_file);
+	write_to_file(&mut buf_writer, &json, &output_path)?;
 
 	Ok(())
 }
