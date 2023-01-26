@@ -1,5 +1,5 @@
 [workspace]
-members = ["api_scraper"]
+members = ["api_scraper", "migrations", "elastic_migrations"]
 
 [workspace.dependencies]
 # error handling
