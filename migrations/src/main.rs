@@ -72,7 +72,7 @@ async fn main() -> Eyre<()> {
 	let chunk_size = args.chunk_size.unwrap_or(DEFAULT_CUNK_SIZE);
 
 	let config_path = args.config_path.unwrap_or_else(|| String::from(DEFAULT_CONFIG_PATH));
-	let config_file = std::fs::read_to_string(&config_path)?;
+	let config_file = std::fs::read_to_string(&config_path).expect("Missing `config.toml` file.");
 	let config: Config = toml::from_str(&config_file)?;
 	let conn = MySqlPoolOptions::new().max_connections(1).connect(&config.database_url).await?;
 	let table_name = &args.table_name;
