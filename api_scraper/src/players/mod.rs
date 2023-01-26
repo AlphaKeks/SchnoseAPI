@@ -8,7 +8,7 @@ use {
 
 pub(crate) async fn fetch_players(
 	start_offset: i32,
-	chunk_size: u32,
+	mut chunk_size: u32,
 	backwards: bool,
 	limit: u32,
 	delay: u64,
@@ -29,10 +29,17 @@ pub(crate) async fn fetch_players(
 	info!("Starting the requests...");
 	for i in 1.. {
 		let Ok(player_req) = GlobalAPI::get_players(Some(offset), Some(chunk_size), &client).await else {
-					info!("No new players...");
-					std::thread::sleep(delay);
-					continue;
-				};
+			info!("No new players...");
+			if backwards {
+				// we probably hit a hole, just try again with the next position
+				offset += 1;
+			} else {
+				// no new players, we now only want 1 player per request
+				chunk_size = 1;
+			}
+			std::thread::sleep(delay);
+			continue;
+		};
 
 		let player_req = player_req
 			.into_iter()
@@ -59,7 +66,12 @@ pub(crate) async fn fetch_players(
 		if backwards {
 			offset += chunk_size as i32;
 		} else {
-			offset -= chunk_size as i32;
+			let new_offset = offset - chunk_size as i32;
+			if (new_offset).is_negative() {
+				offset = 1;
+			} else {
+				offset = new_offset;
+			}
 		}
 		std::thread::sleep(delay);
 	}

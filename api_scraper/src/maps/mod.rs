@@ -1,9 +1,9 @@
 use {
 	crate::output::{get_file, write_to_file},
+	api_scraper::MergedMap,
 	color_eyre::Result as Eyre,
 	gokz_rs::{GlobalAPI, KZGO},
 	log::{debug, info},
-	serde::{Deserialize, Serialize},
 	std::io::BufWriter,
 };
 
@@ -57,17 +57,4 @@ pub(crate) async fn fetch_maps(output_path: Option<String>) -> Eyre<()> {
 	write_to_file(&mut buf_writer, &json, &output_path)?;
 
 	Ok(())
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct MergedMap {
-	id: u16,
-	name: String,
-	difficulty: u8,
-	validated: bool,
-	filesize: u64,
-	created_by: u64,
-	approved_by: u64,
-	created_on: String,
-	updated_on: String,
 }
