@@ -1,5 +1,6 @@
 mod models;
 mod routes;
+use routes::{index, maps, modes, players, records, servers};
 
 use {
 	axum::{routing::get, Router},
@@ -10,8 +11,6 @@ use {
 	sqlx::{mysql::MySqlPoolOptions, MySql, Pool},
 	std::net::SocketAddr,
 };
-
-use routes::{index, maps, modes, players, servers};
 
 #[tokio::main]
 async fn main() -> Eyre<()> {
@@ -60,6 +59,9 @@ async fn main() -> Eyre<()> {
 		.route("/api/servers", get(servers::index))
 		.route("/api/modes/id/:id", get(modes::id))
 		.route("/api/modes/name/:name", get(modes::name))
+		.route("/api/records/id/:id", get(records::id))
+		.route("/api/records/recent", get(records::recent))
+		.route("/api/records", get(records::index))
 		.with_state(GlobalState { pool });
 
 	axum::Server::bind(&addr)
