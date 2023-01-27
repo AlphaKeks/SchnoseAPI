@@ -57,14 +57,14 @@ async fn main() -> Eyre<()> {
 	color_eyre::install()?;
 	let args = Args::parse();
 
-	std::env::set_var("RUST_LOG", "api_scraper=ERROR");
+	std::env::set_var("RUST_LOG", "migrations=ERROR");
 
 	if !args.quiet {
-		std::env::set_var("RUST_LOG", "api_scraper=INFO");
+		std::env::set_var("RUST_LOG", "migrations=INFO");
 	}
 
 	if args.debug {
-		std::env::set_var("RUST_LOG", "api_scraper=DEBUG");
+		std::env::set_var("RUST_LOG", "migrations=DEBUG");
 	}
 
 	env_logger::init();

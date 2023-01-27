@@ -64,7 +64,7 @@ pub(crate) async fn fetch_players(
 		write_to_file(&mut buf_writer, &json, &output_path)?;
 		info!("{} iterations, {} players", i, total);
 
-		if i * chunk_size == limit {
+		if i * chunk_size >= limit {
 			write_to_file(&mut buf_writer, &[b']'], &output_path)?;
 			break;
 		}

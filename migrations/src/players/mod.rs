@@ -37,9 +37,10 @@ INSERT INTO {table_name}
 VALUES
   (
     {steamid64},
-    "{name}",
+    "{}",
     {is_banned}
-  )"#
+  )"#,
+		name.replace(['"', '\'', ',', '\\'], "")
 	);
 
 	for Player { steamid64, steam_id: _, is_banned, total_records: _, name } in
@@ -49,9 +50,10 @@ VALUES
 			r#"
  ,(
     {steamid64},
-    "{name}",
+    "{}",
     {is_banned}
-  )"#
+  )"#,
+			name.replace(['"', '\'', ',', '\\'], "")
 		));
 	}
 

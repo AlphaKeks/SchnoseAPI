@@ -15,7 +15,7 @@ pub(crate) async fn insert(
 	debug!("> {} records", total);
 
 	for (i, modes) in input.chunks(chunk_size as usize).enumerate() {
-		let sql_query = build_query(modes, table_name);
+		let sql_query = build_query(modes, table_name).await;
 		sqlx::query(&sql_query).execute(database_connection).await?;
 		info!("{} / {} rows. ({}%)", i, total, (i as f32 / total as f32) * 100.0);
 	}
@@ -23,7 +23,7 @@ pub(crate) async fn insert(
 	Ok(())
 }
 
-fn build_query(records: &[Record], table_name: &str) -> String {
+async fn build_query(records: &[Record], table_name: &str) -> String {
 	let Record {
 		id,
 		steamid64,
@@ -51,7 +51,7 @@ fn build_query(records: &[Record], table_name: &str) -> String {
 
 	let mut query = format!(
 		r#"
-INSERT INTO {table_name}
+INSERT IGNORE INTO {table_name}
   (
     map_id,
     mode_id,

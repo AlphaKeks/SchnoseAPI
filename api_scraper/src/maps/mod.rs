@@ -11,6 +11,8 @@ pub(crate) async fn fetch_maps(output_path: Option<String>) -> Eyre<()> {
 	let client = gokz_rs::Client::new();
 
 	let mut global_api_maps = GlobalAPI::get_maps(true, Some(9999), &client).await?;
+	let mut non_global_maps = GlobalAPI::get_maps(false, Some(9999), &client).await?;
+	global_api_maps.append(&mut non_global_maps);
 	info!("Fetched GlobalAPI maps.");
 	debug!("> {} maps", global_api_maps.len());
 
@@ -18,19 +20,17 @@ pub(crate) async fn fetch_maps(output_path: Option<String>) -> Eyre<()> {
 	info!("Fetched KZ:GO maps.");
 	debug!("> {} maps", kzgo_maps.len());
 
-	assert_eq!(global_api_maps.len(), kzgo_maps.len());
+	// assert_eq!(global_api_maps.len(), kzgo_maps.len());
 
 	global_api_maps.sort_unstable_by(|a, b| a.id.cmp(&b.id));
 
 	let maps: Vec<MergedMap> = global_api_maps
 		.into_iter()
 		.map(|global| {
-			let kzgo = kzgo_maps
+			let mapper_id = kzgo_maps
 				.iter()
 				.find(|map| map.name.as_ref().eq(&Some(&global.name)))
-				.unwrap_or_else(|| panic!("Couldn't find `{}`.", &global.name));
-
-			let mapper_id = kzgo.mapperIds[0].as_ref().unwrap().parse::<u64>().unwrap();
+				.map_or(0, |map| map.mapperIds[0].as_ref().unwrap().parse::<u64>().unwrap());
 
 			MergedMap {
 				id: global.id as u16,
@@ -40,7 +40,7 @@ pub(crate) async fn fetch_maps(output_path: Option<String>) -> Eyre<()> {
 				filesize: global.filesize as u64,
 				// HACK: Some mapper ids are way too low (e.g. 21, 37, ...) so we just replace
 				// those with 0.
-				created_by: if mapper_id < 76000000000000000 { 0 } else { mapper_id },
+				created_by: if mapper_id < 76_000_000_000_000_000 { 0 } else { mapper_id },
 				approved_by: global.approved_by_steamid64.parse::<u64>().unwrap(),
 				created_on: global.created_on,
 				updated_on: global.updated_on,

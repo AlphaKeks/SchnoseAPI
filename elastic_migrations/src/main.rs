@@ -11,7 +11,7 @@ use {
 		},
 		Elasticsearch, Scroll, ScrollParts, SearchParts,
 	},
-	gokz_rs::{prelude::*, GlobalAPI},
+	gokz_rs::{players::Player, prelude::*, GlobalAPI},
 	log::info,
 	serde::de::DeserializeOwned,
 	serde::{Deserialize, Serialize},
@@ -30,11 +30,11 @@ struct Args {
 
 	/// How many elastic records to fetch at once. Defaults to `1000`. Maximum is `10000`.
 	#[arg(long)]
-	elastic_chunk_size: Option<i64>,
+	elastic_limit: Option<i64>,
 
 	/// How many rows to insert at once. Defaults to `1000`.
 	#[arg(long)]
-	sql_chunk_size: Option<u64>,
+	chunk_size: Option<u64>,
 
 	/// How long to keep the connection to elastic in minutes. Defaults to `15`.
 	#[arg(short = 'l', long)]
@@ -62,14 +62,14 @@ async fn main() -> Eyre<()> {
 	color_eyre::install()?;
 	let args = Args::parse();
 
-	std::env::set_var("RUST_LOG", "api_scraper=ERROR");
+	std::env::set_var("RUST_LOG", "elastic_migrations=ERROR");
 
 	if !args.quiet {
-		std::env::set_var("RUST_LOG", "api_scraper=INFO");
+		std::env::set_var("RUST_LOG", "elastic_migrations=INFO");
 	}
 
 	if args.debug {
-		std::env::set_var("RUST_LOG", "api_scraper=DEBUG");
+		std::env::set_var("RUST_LOG", "elastic_migrations=DEBUG");
 	}
 
 	env_logger::init();
@@ -84,9 +84,9 @@ async fn main() -> Eyre<()> {
 	let transport = TransportBuilder::new(pool).auth(credentials).build()?;
 	let client = Elasticsearch::new(transport.clone());
 
-	let (elastic_chunk_size, amount_of_searches) = match args.elastic_chunk_size {
-		Some(chunk_size) if chunk_size > 10_000 => (10_000, chunk_size / 10_000),
-		Some(chunk_size) => (chunk_size, 1),
+	let (elastic_chunk_size, amount_of_searches) = match args.elastic_limit {
+		Some(limit) if limit > 10_000 => (10_000, limit / 10_000),
+		Some(limit) => (limit, 1),
 		None => (DEFAULT_CUNK_SIZE, 1),
 	};
 
@@ -121,12 +121,14 @@ async fn main() -> Eyre<()> {
 
 	let conn = MySqlPoolOptions::new().max_connections(1).connect(&config.sql_url).await?;
 	let records = query.into_iter().map(Record::from).collect::<Vec<_>>();
-	let global_maps = GlobalAPI::get_maps(false, Some(9999), &gokz_rs::Client::new())
+	let gokz_client = gokz_rs::Client::new();
+	let global_maps = GlobalAPI::get_maps(false, Some(99999), &gokz_client)
 		.await?
 		.into_iter()
 		.map(|map| (map.name, map.id))
 		.collect::<HashMap<_, _>>();
-	let sql_query = build_query(&records, &args.table_name, &conn, &global_maps).await?;
+	let sql_query =
+		build_query(&records, &args.table_name, &conn, &global_maps, &gokz_client, &conn).await?;
 	sqlx::query(&sql_query).execute(&conn).await?;
 	info!("Inserted {} records.", records.len());
 
@@ -156,8 +158,19 @@ async fn main() -> Eyre<()> {
 				})
 				.collect();
 
-			let sql_query =
-				build_query(&new_records, &args.table_name, &conn, &global_maps).await?;
+			if new_records.is_empty() {
+				info!("no records PogO");
+				continue;
+			}
+			let sql_query = build_query(
+				&new_records,
+				&args.table_name,
+				&conn,
+				&global_maps,
+				&gokz_client,
+				&conn,
+			)
+			.await?;
 			sqlx::query(&sql_query).execute(&conn).await?;
 			info!("Inserted {} records.", new_records.len());
 		}
@@ -287,12 +300,7 @@ impl From<RawRecord> for Record {
 			server_name: value
 				.server_name
 				.unwrap_or_else(|| value.server.unwrap_or_else(|| String::from("unknown"))),
-			created_on: chrono::NaiveDateTime::parse_from_str(
-				&value.created_on,
-				"%Y-%m-%dT%H:%M:%S",
-			)
-			.expect("Failed to parse date.")
-			.timestamp() as u64,
+			created_on: value.created_on,
 		}
 	}
 }
@@ -309,7 +317,7 @@ struct Record {
 	pub teleports: u32,
 	pub time: f64,
 	pub server_name: String,
-	pub created_on: u64,
+	pub created_on: String,
 }
 
 async fn build_query(
@@ -317,6 +325,8 @@ async fn build_query(
 	table_name: &str,
 	conn: &Pool<MySql>,
 	global_maps: &HashMap<String, i32>,
+	client: &gokz_rs::Client,
+	database_connection: &Pool<MySql>,
 ) -> Eyre<String> {
 	let Record {
 		id,
@@ -340,9 +350,47 @@ async fn build_query(
 		server_name
 	))
 	.fetch_one(conn)
-	.await?;
+	.await
+	.unwrap_or(ServerID { id: 0 });
 
-	let map_id = global_maps.get(map_name).unwrap();
+	let map_id = if let Some(map_id) = global_maps.get(map_name) {
+		*map_id
+	} else {
+		let map = GlobalAPI::get_map(&MapIdentifier::Name(map_name.to_owned()), client).await?;
+		std::thread::sleep(std::time::Duration::from_millis(1000));
+		map.id
+	};
+
+	if (sqlx::query_as::<_, PlayerID>(&format!("SELECT id FROM players WHERE id = {steamid64}"))
+		.fetch_one(database_connection)
+		.await)
+		.is_err()
+	{
+		let player =
+			match GlobalAPI::get_player(&PlayerIdentifier::SteamID64(*steamid64), client).await {
+				Ok(player) => player,
+				Err(why) => match why.kind {
+					ErrorKind::Parsing { expected: _, got: _ } => Player {
+						steamid64: steamid64.to_string(),
+						steam_id: SteamID::from(*steamid64).to_string(),
+						is_banned: false,
+						total_records: 0,
+						name: String::from("unknown"),
+					},
+					_ => panic!("`{steamid64}`: FUCK {why:?}"),
+				},
+			};
+		sqlx::query(&format!(
+			r#"INSERT IGNORE INTO players (id, name, is_banned) VALUES ({}, "{}", {})"#,
+			player.steamid64.parse::<u64>()?,
+			player.name,
+			player.is_banned
+		))
+		.execute(database_connection)
+		.await?;
+		info!("ResidentSleeper");
+		std::thread::sleep(std::time::Duration::from_millis(1000));
+	}
 
 	let mut query = format!(
 		r#"
@@ -407,5 +455,11 @@ VALUES
 
 #[derive(Debug, Clone, Copy, sqlx::FromRow)]
 struct ServerID {
-	id: i32,
+	id: u16,
+}
+
+#[allow(unused)]
+#[derive(Debug, Clone, Copy, sqlx::FromRow)]
+struct PlayerID {
+	id: u64,
 }
