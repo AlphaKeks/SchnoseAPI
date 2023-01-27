@@ -11,7 +11,7 @@ use {
 	std::net::SocketAddr,
 };
 
-use routes::{index, maps, players, servers};
+use routes::{index, maps, modes, players, servers};
 
 #[tokio::main]
 async fn main() -> Eyre<()> {
@@ -58,6 +58,8 @@ async fn main() -> Eyre<()> {
 		.route("/api/servers/id/:id", get(servers::id))
 		.route("/api/servers/name/:name", get(servers::name))
 		.route("/api/servers", get(servers::index))
+		.route("/api/modes/id/:id", get(modes::id))
+		.route("/api/modes/name/:name", get(modes::name))
 		.with_state(GlobalState { pool });
 
 	axum::Server::bind(&addr)

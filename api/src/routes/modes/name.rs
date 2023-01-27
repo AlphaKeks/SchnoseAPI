@@ -1,7 +1,7 @@
 use {
 	crate::{
 		models::{
-			maps::{MapModel, MapResponse},
+			modes::{ModeModel, ModeResponse},
 			APIResponse, Error,
 		},
 		GlobalState,
@@ -16,16 +16,16 @@ use {
 pub async fn name(
 	Path(name): Path<String>,
 	State(GlobalState { pool }): State<GlobalState>,
-) -> Result<Json<APIResponse<MapResponse>>, Error> {
+) -> Result<Json<APIResponse<ModeResponse>>, Error> {
 	let start = Utc::now().timestamp_nanos();
-	let map = sqlx::query_as::<_, MapModel>(&format!(
-		r#"SELECT * FROM maps WHERE name LIKE "%{name}%" LIMIT 1"#
+	let mode = sqlx::query_as::<_, ModeModel>(&format!(
+		r#"SELECT * FROM modes WHERE name LIKE "%{name}%" OR name_short LIKE "%{name}%" OR name_long LIKE "%{name}" LIMIT 1"#
 	))
 	.fetch_one(&pool)
 	.await?;
 
 	Ok(Json(APIResponse {
-		result: map.into(),
+		result: mode.into(),
 		took: Utc::now().timestamp_nanos() - start,
 	}))
 }

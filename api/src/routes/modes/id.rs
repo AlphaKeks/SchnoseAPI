@@ -1,7 +1,7 @@
 use {
 	crate::{
 		models::{
-			maps::{MapModel, MapResponse},
+			modes::{ModeModel, ModeResponse},
 			APIResponse, Error,
 		},
 		GlobalState,
@@ -14,16 +14,16 @@ use {
 };
 
 pub async fn id(
-	Path(id): Path<u64>,
+	Path(id): Path<u8>,
 	State(GlobalState { pool }): State<GlobalState>,
-) -> Result<Json<APIResponse<MapResponse>>, Error> {
+) -> Result<Json<APIResponse<ModeResponse>>, Error> {
 	let start = Utc::now().timestamp_nanos();
-	let map = sqlx::query_as::<_, MapModel>(&format!("SELECT * FROM maps WHERE id = {id}"))
+	let mode = sqlx::query_as::<_, ModeModel>(&format!("SELECT * FROM modes WHERE id = {id}"))
 		.fetch_one(&pool)
 		.await?;
 
 	Ok(Json(APIResponse {
-		result: map.into(),
+		result: mode.into(),
 		took: Utc::now().timestamp_nanos() - start,
 	}))
 }
