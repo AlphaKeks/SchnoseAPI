@@ -18,10 +18,25 @@ pub async fn id(
 	State(GlobalState { pool }): State<GlobalState>,
 ) -> Result<Json<APIResponse<ServerResponse>>, Error> {
 	let start = Utc::now().timestamp_nanos();
-	let server =
-		sqlx::query_as::<_, ServerModel>(&format!("SELECT * FROM servers WHERE id = {id}"))
-			.fetch_one(&pool)
-			.await?;
+	let server = sqlx::query_as::<_, ServerModel>(&format!(
+		r#"
+		SELECT
+		  server.id,
+		  server.name,
+		  server.owner_id,
+		  owner.name AS owner_name,
+		  server.approved_by AS approved_by_id,
+		  approver.name AS approved_by_name,
+		  server.approved_on,
+		  server.updated_on
+		FROM servers AS server
+		JOIN players AS owner ON server.owner_id = owner.id
+		JOIN players AS approver ON server.approved_by = approver.id
+		WHERE server.id = {id}
+		"#,
+	))
+	.fetch_one(&pool)
+	.await?;
 
 	Ok(Json(APIResponse {
 		result: server.into(),

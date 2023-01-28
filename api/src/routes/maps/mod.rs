@@ -25,7 +25,25 @@ pub async fn index(
 	State(GlobalState { pool }): State<GlobalState>,
 ) -> Result<Json<APIResponse<Vec<MapResponse>>>, Error> {
 	let start = Utc::now().timestamp_nanos();
-	let mut base_query = QueryBuilder::<sqlx::MySql>::new("SELECT * FROM maps");
+	let mut base_query = QueryBuilder::<sqlx::MySql>::new(
+		r#"
+		SELECT
+		  map.id,
+		  map.name,
+		  map.difficulty,
+		  map.validated,
+		  map.filesize,
+		  map.created_by AS created_by_id,
+		  mapper.name AS created_by_name,
+		  map.approved_by AS approved_by_id,
+		  approver.name AS approved_by_name,
+		  map.created_on,
+		  map.updated_on
+		FROM maps AS map
+		JOIN players AS mapper ON mapper.id = map.created_by
+		JOIN players AS approver ON approver.id = map.approved_by
+		"#,
+	);
 	let mut query = QueryBuilder::<sqlx::MySql>::new("");
 
 	if let Some(name) = name {

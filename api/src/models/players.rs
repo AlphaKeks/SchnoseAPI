@@ -1,4 +1,5 @@
 use {
+	gokz_rs::prelude::*,
 	serde::{Deserialize, Serialize},
 	sqlx::types::time::{PrimitiveDateTime, Time},
 };
@@ -22,10 +23,8 @@ pub struct PlayerModel {
 pub struct PlayerResponse {
 	pub id: u64,
 	pub name: String,
+	pub steam_id: String,
 	pub is_banned: bool,
-	pub first_login: String,
-	pub last_login: String,
-	pub playtime: String,
 }
 
 impl From<PlayerModel> for PlayerResponse {
@@ -33,10 +32,8 @@ impl From<PlayerModel> for PlayerResponse {
 		Self {
 			id: value.id,
 			name: value.name,
+			steam_id: SteamID::from(value.id).to_string(),
 			is_banned: value.is_banned,
-			first_login: value.first_login.to_string(),
-			last_login: value.last_login.to_string(),
-			playtime: value.playtime.to_string(),
 		}
 	}
 }

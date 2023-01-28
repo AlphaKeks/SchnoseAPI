@@ -1,6 +1,6 @@
 mod models;
 mod routes;
-use routes::{index, maps, modes, players, records, servers};
+use routes::{api, index, maps, modes, players, records, servers};
 
 use {
 	axum::{routing::get, Router},
@@ -46,8 +46,8 @@ async fn main() -> Eyre<()> {
 
 	let app = Router::new()
 		.route("/", get(index))
-		.route("/api", get(index))
-		.route("/api/", get(index))
+		.route("/api", get(api))
+		.route("/api/", get(api))
 		.route("/api/players/id/:id", get(players::id))
 		.route("/api/players/name/:name", get(players::name))
 		.route("/api/players", get(players::index))

@@ -26,7 +26,22 @@ pub async fn index(
 ) -> Result<Json<APIResponse<Vec<ServerResponse>>>, Error> {
 	let start = Utc::now().timestamp_nanos();
 
-	let mut query = QueryBuilder::<MySql>::new("SELECT * FROM servers ");
+	let mut query = QueryBuilder::<MySql>::new(
+		r#"
+		SELECT
+		  server.id,
+		  server.name,
+		  server.owner_id,
+		  owner.name AS owner_name,
+		  server.approved_by AS approved_by_id,
+		  approver.name AS approved_by_name,
+		  server.approved_on,
+		  server.updated_on
+		FROM servers AS server
+		JOIN players AS owner ON server.owner_id = owner.id
+		JOIN players AS approver ON server.approved_by = approver.id
+		"#,
+	);
 
 	if let Some(name) = name {
 		query.push(r#"AND name LIKE "%"#);

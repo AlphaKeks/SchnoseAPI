@@ -31,6 +31,6 @@ tokio = { workspace = true }
 # SQL
 sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "mysql", "time"] }
 
-# HTTP
+# Backend
 axum = "0.6"
 axum-extra = "0.4"
