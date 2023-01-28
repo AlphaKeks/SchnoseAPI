@@ -116,26 +116,31 @@ async fn main() -> Eyre<()> {
 		elastic_chunk_size,
 		&client,
 		Some(filter),
+		&time_limit,
 	)
 	.await?;
 
 	let conn = MySqlPoolOptions::new().max_connections(1).connect(&config.sql_url).await?;
 	let records = query.into_iter().map(Record::from).collect::<Vec<_>>();
 	let gokz_client = gokz_rs::Client::new();
-	let global_maps = GlobalAPI::get_maps(false, Some(99999), &gokz_client)
-		.await?
-		.into_iter()
-		.map(|map| (map.name, map.id))
-		.collect::<HashMap<_, _>>();
+
+	let mut global_maps = GlobalAPI::get_maps(true, Some(99999), &gokz_client).await?;
+	let mut non_global_maps = GlobalAPI::get_maps(false, Some(99999), &gokz_client).await?;
+	global_maps.append(&mut non_global_maps);
+
+	let global_maps =
+		global_maps.into_iter().map(|map| (map.name, map.id)).collect::<HashMap<_, _>>();
+
 	let sql_query =
 		build_query(&records, &args.table_name, &conn, &global_maps, &gokz_client, &conn).await?;
+
 	sqlx::query(&sql_query).execute(&conn).await?;
 	info!("Inserted {} records.", records.len());
 
 	if let Some(scroll_id) = id {
 		for _ in 1..amount_of_searches {
 			let scroll = Scroll::new(&transport, ScrollParts::ScrollId(&scroll_id));
-			let scroll_result = elastic_query_with_scroll_id::<RawRecord, _, _>(
+			let Ok(scroll_result) = elastic_query_with_scroll_id::<RawRecord, _, _>(
 				json! {
 					{
 						"scroll": &time_limit,
@@ -146,7 +151,10 @@ async fn main() -> Eyre<()> {
 				&scroll_id,
 				Some(filter),
 			)
-			.await?;
+			.await else {
+				info!("no records PogO");
+				continue;
+			};
 
 			let new_records: Vec<Record> = scroll_result
 				.into_iter()
@@ -191,6 +199,7 @@ async fn elastic_query<T, Q, F>(
 	chunk_size: i64,
 	client: &Elasticsearch,
 	filter: Option<F>,
+	time_limit: &str,
 ) -> Eyre<(Option<String>, Vec<T>)>
 where
 	T: DeserializeOwned + std::fmt::Debug,
@@ -201,7 +210,7 @@ where
 		.search(SearchParts::Index(&["kzrecords2"]))
 		.from(0)
 		.size(chunk_size)
-		.scroll("1m")
+		.scroll(time_limit)
 		.body(query)
 		.send()
 		.await?;
@@ -333,7 +342,7 @@ async fn build_query(
 		map_name,
 		steam_id: _,
 		player_name: _,
-		steam_id64: steamid64,
+		steam_id64,
 		mode,
 		stage,
 		teleports,
@@ -346,49 +355,42 @@ async fn build_query(
 	let mode_id = mode as u8;
 
 	let ServerID { id: server_id } = sqlx::query_as::<_, ServerID>(&format!(
-		r#"SELECT id FROM servers WHERE name = "{}" LIMIT 1"#,
-		server_name
+		r#"SELECT id FROM servers WHERE name = "{server_name}" LIMIT 1"#,
 	))
 	.fetch_one(conn)
 	.await
 	.unwrap_or(ServerID { id: 0 });
 
-	let map_id = if let Some(map_id) = global_maps.get(map_name) {
-		*map_id
-	} else {
-		let map = GlobalAPI::get_map(&MapIdentifier::Name(map_name.to_owned()), client).await?;
-		std::thread::sleep(std::time::Duration::from_millis(1000));
-		map.id
-	};
+	let map_id = global_maps.get(map_name).unwrap();
 
-	if (sqlx::query_as::<_, PlayerID>(&format!("SELECT id FROM players WHERE id = {steamid64}"))
+	if sqlx::query_as::<_, PlayerID>(&format!("SELECT id FROM players WHERE id = {steam_id64}"))
 		.fetch_one(database_connection)
-		.await)
+		.await
 		.is_err()
 	{
 		let player =
-			match GlobalAPI::get_player(&PlayerIdentifier::SteamID64(*steamid64), client).await {
+			match GlobalAPI::get_player(&PlayerIdentifier::SteamID64(*steam_id64), client).await {
 				Ok(player) => player,
 				Err(why) => match why.kind {
 					ErrorKind::Parsing { expected: _, got: _ } => Player {
-						steamid64: steamid64.to_string(),
-						steam_id: SteamID::from(*steamid64).to_string(),
+						steamid64: steam_id64.to_string(),
+						steam_id: SteamID::from(*steam_id64).to_string(),
 						is_banned: false,
 						total_records: 0,
 						name: String::from("unknown"),
 					},
-					_ => panic!("`{steamid64}`: FUCK {why:?}"),
+					_ => panic!("`{steam_id64}`: FUCK {why:?}"),
 				},
 			};
 		sqlx::query(&format!(
-			r#"INSERT IGNORE INTO players (id, name, is_banned) VALUES ({}, "{}", {})"#,
+			r#"INSERT INTO players (id, name, is_banned) VALUES ({}, "{}", {})"#,
 			player.steamid64.parse::<u64>()?,
 			player.name,
 			player.is_banned
 		))
 		.execute(database_connection)
 		.await?;
-		info!("ResidentSleeper");
+		info!("ResidentSleeper {steam_id64}");
 		std::thread::sleep(std::time::Duration::from_millis(1000));
 	}
 
@@ -410,7 +412,7 @@ VALUES
   (
     {map_id},
     {mode_id},
-    {steamid64},
+    {steam_id64},
     {server_id},
     {stage},
     {teleports},
@@ -422,24 +424,71 @@ VALUES
 
 	for Record {
 		id,
-		map_name: _,
+		map_name,
 		steam_id: _,
 		player_name: _,
-		steam_id64: _,
-		mode: _,
+		steam_id64,
+		mode,
 		stage,
 		teleports,
 		time,
-		server_name: _,
+		server_name,
 		created_on,
 	} in records.iter().skip(1)
 	{
+		let mode = Mode::try_from(*mode).unwrap();
+		let mode_id = mode as u8;
+
+		let ServerID { id: server_id } = sqlx::query_as::<_, ServerID>(&format!(
+			r#"SELECT id FROM servers WHERE name = "{server_name}" LIMIT 1"#,
+		))
+		.fetch_one(conn)
+		.await
+		.unwrap_or(ServerID { id: 0 });
+
+		let map_id = global_maps.get(map_name).unwrap();
+
+		if sqlx::query_as::<_, PlayerID>(&format!("SELECT id FROM players WHERE id = {steam_id64}"))
+			.fetch_one(database_connection)
+			.await
+			.is_err()
+		{
+			let player = match GlobalAPI::get_player(
+				&PlayerIdentifier::SteamID64(*steam_id64),
+				client,
+			)
+			.await
+			{
+				Ok(player) => player,
+				Err(why) => match why.kind {
+					ErrorKind::Parsing { expected: _, got: _ } => Player {
+						steamid64: steam_id64.to_string(),
+						steam_id: SteamID::from(*steam_id64).to_string(),
+						is_banned: false,
+						total_records: 0,
+						name: String::from("unknown"),
+					},
+					_ => panic!("`{steam_id64}`: FUCK {why:?}"),
+				},
+			};
+			sqlx::query(&format!(
+				r#"INSERT INTO players (id, name, is_banned) VALUES ({}, "{}", {})"#,
+				player.steamid64.parse::<u64>()?,
+				player.name,
+				player.is_banned
+			))
+			.execute(database_connection)
+			.await?;
+			info!("ResidentSleeper {steam_id64}");
+			std::thread::sleep(std::time::Duration::from_millis(1000));
+		}
+
 		query.push_str(&format!(
 			r#"
  ,(
     {map_id},
     {mode_id},
-    {steamid64},
+    {steam_id64},
     {server_id},
     {stage},
     {teleports},
