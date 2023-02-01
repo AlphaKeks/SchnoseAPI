@@ -1,5 +1,5 @@
 [workspace]
-members = ["fetching/global_api"]
+members = ["fetching/global_api", "fetching/elastic"]
 
 [workspace.dependencies]
 # error handling
