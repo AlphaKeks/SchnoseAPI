@@ -1,5 +1,5 @@
 [workspace]
-members = ["api_scraper", "migrations", "elastic_migrations", "api"]
+members = ["fetching/global_api"]
 
 [workspace.dependencies]
 # error handling
