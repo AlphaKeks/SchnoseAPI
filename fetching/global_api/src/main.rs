@@ -4,6 +4,8 @@
 mod maps;
 mod modes;
 mod players;
+mod records;
+mod servers;
 
 use {
 	clap::{Parser, Subcommand},
@@ -73,6 +75,7 @@ async fn main() -> Eyre<()> {
 	match args.data_type {
 		DataType::Maps { id } => maps::fetch(id, &mut buf_writer, &gokz_client).await?,
 		DataType::Modes { id } => modes::fetch(id, &mut buf_writer, &gokz_client).await?,
+		DataType::Servers { id } => servers::fetch(id, &mut buf_writer, &gokz_client).await?,
 		DataType::Players {
 			start_offset,
 			chunk_size,
@@ -83,6 +86,9 @@ async fn main() -> Eyre<()> {
 				start_offset, chunk_size, backwards, limit, &mut buf_writer, &gokz_client,
 			)
 			.await?
+		}
+		DataType::Records { start_id, backwards, limit } => {
+			records::fetch(start_id, backwards, limit, &mut buf_writer, &gokz_client).await?
 		}
 	}
 
@@ -103,6 +109,13 @@ enum DataType {
 	/// `/modes`
 	Modes {
 		/// Fetch a single mode by ID instead of all modes.
+		#[arg(long)]
+		id: Option<u16>,
+	},
+
+	/// `/servers`
+	Servers {
+		/// Fetch a single server by ID instead of all servers.
 		#[arg(long)]
 		id: Option<u16>,
 	},
@@ -128,6 +141,24 @@ enum DataType {
 		#[clap(default_value = "500")]
 		limit: usize,
 	},
+
+	/// `/records`
+	Records {
+		/// The ID to start at.
+		#[arg(long = "start")]
+		#[clap(default_value = "0")]
+		start_id: usize,
+
+		/// Increase the offset instead of decreasing it each iteration.
+		#[arg(short, long)]
+		#[clap(default_value = "false")]
+		backwards: bool,
+
+		/// How many records to fetch before stopping.
+		#[arg(short, long)]
+		#[clap(default_value = "500")]
+		limit: usize,
+	},
 }
 
 impl std::fmt::Display for DataType {
@@ -138,7 +169,9 @@ impl std::fmt::Display for DataType {
 			match self {
 				Self::Maps { .. } => "maps",
 				Self::Modes { .. } => "modes",
+				Self::Servers { .. } => "servers",
 				Self::Players { .. } => "players",
+				Self::Records { .. } => "records",
 			}
 		)
 	}
