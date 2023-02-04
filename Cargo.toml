@@ -1,5 +1,5 @@
 [workspace]
-members = ["fetching/global_api", "fetching/elastic"]
+members = ["fetching/global_api", "fetching/elastic", "schnosedb"]
 
 [workspace.dependencies]
 # error handling
@@ -21,7 +21,7 @@ toml = "0.5"
 chrono = "0.4"
 
 # GOKZ
-gokz_rs = "0.14"
+gokz_rs = "0.15"
 
 # async runtime
 tokio = { version = "1", features = ["full"] }
