@@ -49,17 +49,17 @@ pub async fn insert(data: &[PlayerSchema], pool: &Pool<MySql>) -> Eyre<usize> {
 	let mut transaction = pool.begin().await?;
 
 	for (i, PlayerSchema { id, name, is_banned }) in data.iter().enumerate() {
-		sqlx::query! {
+		sqlx::query(&format!(
 			r#"
 			INSERT INTO players
 			  (id, name, is_banned)
 			VALUES
-			  (?, ?, ?)
+			  ({}, "{}", {})
 			"#,
 			id,
 			sanitize(name),
 			is_banned
-		}
+		))
 		.execute(&mut transaction)
 		.await?;
 

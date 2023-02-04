@@ -101,12 +101,12 @@ pub async fn insert(data: &[RecordSchema], pool: &Pool<MySql>) -> Eyre<usize> {
 				.fetch_one(pool)
 				.await?;
 
-		sqlx::query! {
+		sqlx::query(&format!(
 			r#"
 			INSERT INTO records
 			  (id, course_id, mode_id, player_id, server_id, time, teleports, created_on)
 			VALUES
-			  (?, ?, ?, ?, ?, ?, ?, ?)
+			  ({}, {}, {}, {}, {}, {}, {}, "{}")
 			"#,
 			id,
 			course_id + *__stage as u16,
@@ -116,7 +116,7 @@ pub async fn insert(data: &[RecordSchema], pool: &Pool<MySql>) -> Eyre<usize> {
 			time,
 			teleports,
 			created_on.rsplit_once(' ').unwrap().0
-		}
+		))
 		.execute(&mut transaction)
 		.await?;
 

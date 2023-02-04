@@ -117,12 +117,12 @@ pub async fn insert(
 
 		courses = kzgo_map.bonuses.unwrap();
 
-		sqlx::query! {
+		sqlx::query(&format!(
 			r#"
 			INSERT INTO maps
 			  (id, name, courses, validated, filesize, created_by, approved_by, created_on, updated_on)
 			VALUES
-			  (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			  ({}, "{}", {}, {}, {}, {}, {}, "{}", "{}")
 			"#,
 			id,
 			name,
@@ -133,7 +133,7 @@ pub async fn insert(
 			approved_by,
 			created_on.rsplit_once(' ').unwrap().0,
 			updated_on.rsplit_once(' ').unwrap().0
-		}
+		))
 		.execute(&mut transaction)
 		.await?;
 

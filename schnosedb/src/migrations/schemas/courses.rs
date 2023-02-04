@@ -84,17 +84,24 @@ pub async fn insert(
 		.enumerate()
 	{
 		for stage in 0..kzgo_bonuses.unwrap_or(1) {
-			sqlx::query! {
-					r#"
-			INSERT INTO courses
-			  (map_id, stage, kzt, kzt_difficulty, skz, skz_difficulty, vnl, vnl_difficulty)
-			VALUES
-			  (?, ?, ?, ?, ?, ?, ?, ?)
-						"#,
-						id, stage, name.starts_with("skz_") || name.starts_with("vnl_"), difficulty, kzgo_sp, difficulty, kzgo_vp, difficulty
-				}
-					.execute(&mut transaction)
-				.await?;
+			sqlx::query(&format!(
+				r#"
+				INSERT INTO courses
+				  (map_id, stage, kzt, kzt_difficulty, skz, skz_difficulty, vnl, vnl_difficulty)
+				VALUES
+				  ({}, {}, {}, {}, {}, {}, {}, {})
+				"#,
+				id,
+				stage,
+				!name.starts_with("skz_") && !name.starts_with("vnl_"),
+				difficulty,
+				kzgo_sp.unwrap_or_default(),
+				difficulty,
+				kzgo_vp.unwrap_or_default(),
+				difficulty
+			))
+			.execute(&mut transaction)
+			.await?;
 
 			info!("{} ({stage})", i + 1);
 		}

@@ -54,17 +54,17 @@ pub async fn insert(data: &[ModeSchema], pool: &Pool<MySql>) -> Eyre<usize> {
 
 	for (i, ModeSchema { id, name, created_on }) in data.iter().enumerate() {
 		let created_on = created_on.to_string();
-		sqlx::query! {
+		sqlx::query(&format!(
 			r#"
 			INSERT INTO modes
 			  (id, name, created_on)
 			VALUES
-			  (?, ?, ?)
+			  ({}, "{}", "{}")
 			"#,
 			id,
 			sanitize(name),
 			created_on.rsplit_once(' ').unwrap().0
-		}
+		))
 		.execute(&mut transaction)
 		.await?;
 

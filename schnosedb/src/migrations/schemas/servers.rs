@@ -53,18 +53,18 @@ pub async fn insert(data: &[ServerSchema], pool: &Pool<MySql>) -> Eyre<usize> {
 	let mut transaction = pool.begin().await?;
 
 	for (i, ServerSchema { id, name, owned_by, approved_by }) in data.iter().enumerate() {
-		sqlx::query! {
+		sqlx::query(&format!(
 			r#"
 			INSERT INTO servers
 			  (id, name, owned_by, approved_by)
 			VALUES
-			  (?, ?, ?, ?)
+			  ({}, "{}", {}, {})
 			"#,
 			id,
 			sanitize(name),
 			owned_by,
 			approved_by
-		}
+		))
 		.execute(&mut transaction)
 		.await?;
 
