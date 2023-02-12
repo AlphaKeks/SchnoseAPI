@@ -3,11 +3,15 @@ mod migrations;
 use {
 	clap::Parser,
 	color_eyre::Result as Eyre,
-	gokz_rs::{maps::Map, modes::APIMode, players::Player, records::Record, servers::Server},
+	gokz_rs::{maps::Map, modes::APIMode, players::Player, servers::Server},
 	log::info,
 	migrations::{
 		schemas::{
-			self, maps::MapSchema, modes::ModeSchema, players::PlayerSchema, records::RecordSchema,
+			self,
+			maps::MapSchema,
+			modes::ModeSchema,
+			players::PlayerSchema,
+			records::{ElasticRecord, RecordSchema},
 			servers::ServerSchema,
 		},
 		Schema, SqlAction,
@@ -97,9 +101,10 @@ async fn main() -> Eyre<()> {
 			}
 			Schema::Records => {
 				let data = std::fs::read_to_string(data)?;
-				let data = serde_json::from_str::<Vec<Record>>(&data)?
+				let data = serde_json::from_str::<Vec<ElasticRecord>>(&data)?
 					.into_iter()
 					.filter_map(|record| RecordSchema::try_from(record).ok())
+					.take(500)
 					.collect::<Vec<RecordSchema>>();
 				let count =
 					schemas::records::insert(&data, &pool, &config.steam_key, &gokz_client).await?;

@@ -6,7 +6,8 @@ use {
 	chrono::{DateTime, TimeZone, Utc},
 	color_eyre::Result as Eyre,
 	gokz_rs::{prelude::Mode, records::Record},
-	log::{error, info},
+	log::{debug, error, info},
+	serde::{Deserialize, Serialize},
 	sqlx::{FromRow, MySql, Pool},
 	std::time::Duration,
 };
@@ -17,11 +18,55 @@ pub struct RecordSchema {
 	pub course_id: u16,
 	pub mode_id: u8,
 	pub player_id: u32,
-	pub server_id: u16,
 	pub time: f64,
 	pub teleports: u32,
 	pub created_on: DateTime<Utc>,
+	pub __server_name: String,
 	pub __stage: u8,
+	pub __map_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ElasticRecord {
+	pub id: u32,
+	pub steamid64: u64,
+	pub player_name: String,
+	pub steam_id: String,
+	pub server_name: String,
+	pub map_name: String,
+	pub stage: u8,
+	pub mode: String,
+	pub tickrate: u8,
+	pub time: f64,
+	pub teleports: u32,
+	pub created_on: String,
+}
+
+impl TryFrom<ElasticRecord> for RecordSchema {
+	type Error = String;
+
+	fn try_from(value: ElasticRecord) -> Result<Self, Self::Error> {
+		let Ok(created_on) = Utc.datetime_from_str(&value.created_on, "%Y-%m-%dT%H:%M:%S") else {
+			return Err(String::from("bad date"));
+    	};
+
+		let Ok(mode) = value.mode.parse::<Mode>() else {
+			return Err(String::from("bad mode"));
+    	};
+
+		Ok(Self {
+			id: value.id,
+			course_id: 0,
+			mode_id: mode as u8,
+			player_id: (value.steamid64 - MAGIC_NUMBER) as u32,
+			time: value.time,
+			teleports: value.teleports,
+			created_on,
+			__server_name: value.server_name,
+			__stage: value.stage,
+			__map_name: value.map_name,
+		})
+	}
 }
 
 impl TryFrom<Record> for RecordSchema {
@@ -45,17 +90,28 @@ impl TryFrom<Record> for RecordSchema {
 			course_id: 0,
 			mode_id: mode as u8,
 			player_id: (player_id - MAGIC_NUMBER) as u32,
-			server_id: value.server_id as u16,
 			time: value.time,
 			teleports: value.teleports as u32,
 			created_on,
+			__server_name: value
+				.server_name
+				.unwrap_or_else(|| String::from("unknown")),
 			__stage: value.stage as u8,
+			__map_name: value
+				.map_name
+				.unwrap_or_else(|| String::from("unknown")),
 		})
 	}
 }
 
 #[derive(FromRow)]
+struct ServerID(u16);
+
+#[derive(FromRow)]
 struct CourseID(u16);
+
+#[derive(FromRow)]
+struct MapID(u16);
 
 pub const fn up() -> &'static str {
 	r#"
@@ -96,11 +152,12 @@ pub async fn insert(
 			course_id: _,
 			mode_id,
 			mut player_id,
-			server_id,
 			time,
 			teleports,
 			created_on,
+			__server_name,
 			__stage,
+			__map_name,
 		},
 	) in data.iter().enumerate()
 	{
@@ -118,17 +175,30 @@ pub async fn insert(
 			if let Ok(player) = util::get_player(steam_id64, steam_key, gokz_client).await {
 				let player = migrations::schemas::players::PlayerSchema::try_from(player).unwrap();
 				migrations::schemas::players::insert(&[player], pool).await?;
-				std::thread::sleep(Duration::from_millis(500));
 			} else {
+				debug!("player {steam_id64} doesn't exist");
 				player_id = 0;
 			};
+			std::thread::sleep(Duration::from_millis(500));
 		}
 
 		let created_on = created_on.to_string();
-		let CourseID(course_id) =
-			sqlx::query_as::<_, CourseID>(&format!("SELECT id FROM courses WHERE map_id = {id}"))
+		let MapID(map_id) =
+			sqlx::query_as(&format!(r#"SELECT id FROM maps WHERE name = "{__map_name}""#))
 				.fetch_one(pool)
 				.await?;
+		let CourseID(course_id) = sqlx::query_as::<_, CourseID>(&format!(
+			"SELECT id FROM courses WHERE map_id = {map_id}"
+		))
+		.fetch_one(pool)
+		.await?;
+
+		let ServerID(server_id) = sqlx::query_as::<_, ServerID>(&format!(
+			r#"SELECT id FROM servers WHERE name = "{__server_name}""#
+		))
+		.fetch_one(pool)
+		.await
+		.unwrap_or(ServerID(0));
 
 		sqlx::query(&format!(
 			r#"
