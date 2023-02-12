@@ -186,15 +186,16 @@ pub async fn insert(
 		}
 
 		let created_on = created_on.to_string();
-		let MapID(map_id) =
+		let Ok(MapID(map_id)) =
 			sqlx::query_as(&format!(r#"SELECT id FROM maps WHERE name = "{__map_name}""#))
 				.fetch_one(pool)
-				.await?;
-		let CourseID(course_id) = sqlx::query_as::<_, CourseID>(&format!(
+				.await else { continue; };
+
+		let Ok(CourseID(course_id)) = sqlx::query_as::<_, CourseID>(&format!(
 			"SELECT id FROM courses WHERE map_id = {map_id}"
 		))
 		.fetch_one(pool)
-		.await?;
+		.await else { continue; };
 
 		let ServerID(server_id) = sqlx::query_as::<_, ServerID>(&format!(
 			r#"SELECT id FROM servers WHERE name = "{__server_name}""#
