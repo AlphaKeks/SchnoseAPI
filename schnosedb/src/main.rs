@@ -104,7 +104,6 @@ async fn main() -> Eyre<()> {
 				let data = serde_json::from_str::<Vec<ElasticRecord>>(&data)?
 					.into_iter()
 					.filter_map(|record| RecordSchema::try_from(record).ok())
-					.take(500)
 					.collect::<Vec<RecordSchema>>();
 				let count =
 					schemas::records::insert(&data, &pool, &config.steam_key, &gokz_client).await?;
