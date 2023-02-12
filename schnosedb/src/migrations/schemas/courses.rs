@@ -49,41 +49,35 @@ pub async fn insert(
 
 	let mut count = 1;
 
-	for (
-		i,
-		(
-			Map {
-				id,
-				name,
-				filesize: _,
-				validated: _,
-				difficulty,
-				created_on: _,
-				updated_on: _,
-				approved_by_steamid64: _,
-				workshop_url: _,
-				download_url: _,
-			},
-			KZGOMap {
-				_id: _,
-				name: _,
-				id: _,
-				tier: _,
-				workshopId: _,
-				bonuses: kzgo_bonuses,
-				sp: kzgo_sp,
-				vp: kzgo_vp,
-				mapperNames: _,
-				mapperIds: _,
-				date: _,
-			},
-		),
-	) in global_maps
+	let mut kzgo_maps = kzgo_maps.into_iter();
+	let maps = global_maps
 		.into_iter()
-		.zip(kzgo_maps)
-		.enumerate()
+		.map(|map| {
+			let (kzgo_bonuses, kzgo_sp, kzgo_vp) = kzgo_maps
+				.find(
+					|kzgo_map| {
+						if let Some(name) = &kzgo_map.name {
+							name == &map.name
+						} else {
+							false
+						}
+					},
+				)
+				.map(|kzgo_map| {
+					(
+						kzgo_map.bonuses.unwrap_or(0),
+						kzgo_map.sp.unwrap_or_default(),
+						kzgo_map.vp.unwrap_or_default(),
+					)
+				})
+				.unwrap_or((0, true, true));
+			(map.id, map.name, map.difficulty, kzgo_bonuses, kzgo_sp, kzgo_vp)
+		})
+		.collect::<Vec<_>>();
+
+	for (i, (id, name, difficulty, kzgo_bonuses, kzgo_sp, kzgo_vp)) in maps.into_iter().enumerate()
 	{
-		for stage in 0..kzgo_bonuses.unwrap_or(1) {
+		for stage in 0..kzgo_bonuses {
 			sqlx::query(&format!(
 				r#"
 				INSERT INTO courses
@@ -96,9 +90,9 @@ pub async fn insert(
 				stage,
 				!name.starts_with("skz_") && !name.starts_with("vnl_"),
 				difficulty,
-				kzgo_sp.unwrap_or_default(),
+				kzgo_sp,
 				difficulty,
-				kzgo_vp.unwrap_or_default(),
+				kzgo_vp,
 				difficulty
 			))
 			.execute(&mut transaction)

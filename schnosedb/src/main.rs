@@ -86,7 +86,7 @@ async fn main() -> Eyre<()> {
 				let count =
 					schemas::maps::insert(&data, kzgo_maps, &config.steam_key, &gokz_client, &pool)
 						.await?;
-				info!("Inserted {count} rows into `servers`.");
+				info!("Inserted {count} rows into `maps`.");
 			}
 			Schema::Courses => {
 				let data = std::fs::read_to_string(data)?;
