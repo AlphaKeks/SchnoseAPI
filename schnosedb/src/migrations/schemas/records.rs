@@ -193,7 +193,7 @@ pub async fn insert(
 		.await else { continue; };
 
 		let CourseID(course_id) = match sqlx::query_as::<_, CourseID>(&format!(
-			r#"SELECT id FROM courses WHERE map_id = {}"#,
+			r#"SELECT id FROM courses WHERE id = {}"#,
 			map_id as u32 * 100 + *__stage as u32
 		))
 		.fetch_one(pool)
