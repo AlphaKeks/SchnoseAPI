@@ -7,7 +7,7 @@ use {
 
 #[derive(Debug, Clone, FromRow)]
 pub struct CourseSchema {
-	pub id: u16,
+	pub id: u32,
 	pub map_id: u16,
 	pub stage: u8,
 	pub kzt: bool,

@@ -1,6 +1,6 @@
 use {
 	crate::{
-		migrations::{self, util},
+		migrations::{self, schemas::courses::CourseSchema, util},
 		MAGIC_NUMBER,
 	},
 	chrono::{DateTime, TimeZone, Utc},
@@ -186,16 +186,56 @@ pub async fn insert(
 		}
 
 		let created_on = created_on.to_string();
-		let Ok(MapID(map_id)) =
-			sqlx::query_as(&format!(r#"SELECT id FROM maps WHERE name = "{__map_name}""#))
-				.fetch_one(pool)
-				.await else { continue; };
-
-		let Ok(CourseID(course_id)) = sqlx::query_as::<_, CourseID>(&format!(
-			"SELECT id FROM courses WHERE map_id = {map_id}"
-		))
+		let Ok(MapID(map_id)) = sqlx::query_as(
+			&format!(r#"SELECT id FROM maps WHERE name = "{__map_name}""#)
+		)
 		.fetch_one(pool)
 		.await else { continue; };
+
+		let CourseID(course_id) = match sqlx::query_as::<_, CourseID>(&format!(
+			r#"SELECT id FROM courses WHERE map_id = {}"#,
+			map_id as u32 * 100 + *__stage as u32
+		))
+		.fetch_one(pool)
+		.await
+		{
+			// cool
+			Ok(course_id) => course_id,
+			// Probably only main course in db because map was not global.
+			// So we just take the main course and copy it.
+			_ => {
+				let CourseSchema {
+					id,
+					map_id,
+					stage,
+					kzt,
+					kzt_difficulty,
+					skz,
+					skz_difficulty,
+					vnl,
+					vnl_difficulty,
+				} = sqlx::query_as::<_, CourseSchema>(&format!(
+					r#"SELECT * FROM courses WHERE map_id = {map_id}"#
+				))
+				.fetch_one(pool)
+				.await?;
+
+				let new_id = id * 100 + *__stage as u32;
+
+				sqlx::query(&format!(
+					r#"
+					INSERT INTO courses
+					  (id, map_id, stage, kzt, kzt_difficulty, skz, skz_difficulty, vnl, vnl_difficulty)
+					VALUES
+					  ({new_id}, {map_id}, {stage}, {kzt}, {kzt_difficulty}, {skz}, {skz_difficulty}, {vnl}, {vnl_difficulty})
+					"#,
+				))
+				.execute(pool)
+				.await?;
+
+				CourseID(new_id)
+			}
+		};
 
 		let ServerID(server_id) = sqlx::query_as::<_, ServerID>(&format!(
 			r#"SELECT id FROM servers WHERE name = "{__server_name}""#
@@ -212,7 +252,7 @@ pub async fn insert(
 			  ({}, {}, {}, {}, {}, {}, {}, "{}")
 			"#,
 			id,
-			course_id + *__stage as u32,
+			course_id,
 			mode_id,
 			player_id,
 			server_id,
