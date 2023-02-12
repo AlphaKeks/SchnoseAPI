@@ -54,11 +54,14 @@ impl TryFrom<ElasticRecord> for RecordSchema {
 			return Err(String::from("bad mode"));
     	};
 
+		let player_id = u32::try_from(value.steamid64 - MAGIC_NUMBER)
+			.map_err(|_| String::from("bad steamid64"))?;
+
 		Ok(Self {
 			id: value.id,
 			course_id: 0,
 			mode_id: mode as u8,
-			player_id: (value.steamid64 - MAGIC_NUMBER) as u32,
+			player_id,
 			time: value.time,
 			teleports: value.teleports,
 			created_on,
