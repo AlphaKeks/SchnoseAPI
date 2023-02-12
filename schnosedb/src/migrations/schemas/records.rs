@@ -111,7 +111,7 @@ impl TryFrom<Record> for RecordSchema {
 struct ServerID(u16);
 
 #[derive(FromRow)]
-struct CourseID(u16);
+struct CourseID(u32);
 
 #[derive(FromRow)]
 struct MapID(u16);
@@ -211,7 +211,7 @@ pub async fn insert(
 			  ({}, {}, {}, {}, {}, {}, {}, "{}")
 			"#,
 			id,
-			course_id + *__stage as u16,
+			course_id + *__stage as u32,
 			mode_id,
 			player_id,
 			server_id,
