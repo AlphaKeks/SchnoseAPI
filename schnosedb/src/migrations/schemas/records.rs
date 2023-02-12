@@ -1,10 +1,14 @@
 use {
-	crate::MAGIC_NUMBER,
+	crate::{
+		migrations::{self, util},
+		MAGIC_NUMBER,
+	},
 	chrono::{DateTime, TimeZone, Utc},
 	color_eyre::Result as Eyre,
 	gokz_rs::{prelude::Mode, records::Record},
-	log::info,
+	log::{error, info},
 	sqlx::{FromRow, MySql, Pool},
+	std::time::Duration,
 };
 
 #[derive(Debug, Clone, FromRow)]
@@ -77,7 +81,12 @@ pub const fn down() -> &'static str {
 	r#"DROP TABLE records"#
 }
 
-pub async fn insert(data: &[RecordSchema], pool: &Pool<MySql>) -> Eyre<usize> {
+pub async fn insert(
+	data: &[RecordSchema],
+	pool: &Pool<MySql>,
+	steam_key: &str,
+	gokz_client: &gokz_rs::Client,
+) -> Eyre<usize> {
 	let mut transaction = pool.begin().await?;
 
 	for (
@@ -86,7 +95,7 @@ pub async fn insert(data: &[RecordSchema], pool: &Pool<MySql>) -> Eyre<usize> {
 			id,
 			course_id: _,
 			mode_id,
-			player_id,
+			mut player_id,
 			server_id,
 			time,
 			teleports,
@@ -95,6 +104,26 @@ pub async fn insert(data: &[RecordSchema], pool: &Pool<MySql>) -> Eyre<usize> {
 		},
 	) in data.iter().enumerate()
 	{
+		if let Err(why) = sqlx::query(&format!(
+			r#"
+			SELECT * FROM players
+			WHERE id = {player_id}
+			"#
+		))
+		.fetch_one(pool)
+		.await
+		{
+			error!("player `{player_id}` not in db. {why:?}");
+			let steam_id64 = player_id as u64 + MAGIC_NUMBER;
+			if let Ok(player) = util::get_player(steam_id64, steam_key, gokz_client).await {
+				let player = migrations::schemas::players::PlayerSchema::try_from(player).unwrap();
+				migrations::schemas::players::insert(&[player], pool).await?;
+				std::thread::sleep(Duration::from_millis(500));
+			} else {
+				player_id = 0;
+			};
+		}
+
 		let created_on = created_on.to_string();
 		let CourseID(course_id) =
 			sqlx::query_as::<_, CourseID>(&format!("SELECT id FROM courses WHERE map_id = {id}"))

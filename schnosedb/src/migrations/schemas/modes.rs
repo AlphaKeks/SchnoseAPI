@@ -3,7 +3,7 @@ use {
 	chrono::{DateTime, TimeZone, Utc},
 	color_eyre::Result as Eyre,
 	gokz_rs::{modes::APIMode, prelude::Mode},
-	log::{error, info},
+	log::info,
 	sqlx::{FromRow, MySql, Pool},
 };
 

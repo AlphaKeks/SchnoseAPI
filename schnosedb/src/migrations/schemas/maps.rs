@@ -1,10 +1,14 @@
 use {
-	crate::MAGIC_NUMBER,
+	crate::{
+		migrations::{self, util},
+		MAGIC_NUMBER,
+	},
 	chrono::{DateTime, TimeZone, Utc},
 	color_eyre::Result as Eyre,
 	gokz_rs::{kzgo::maps::Response as KZGOMap, maps::Map},
-	log::info,
+	log::{error, info},
 	sqlx::{FromRow, MySql, Pool},
+	std::time::Duration,
 };
 
 #[derive(Debug, Clone, FromRow)]
@@ -76,6 +80,8 @@ pub const fn down() -> &'static str {
 pub async fn insert(
 	data: &[MapSchema],
 	kzgo_maps: Vec<KZGOMap>,
+	steam_key: &str,
+	gokz_client: &gokz_rs::Client,
 	pool: &Pool<MySql>,
 ) -> Eyre<usize> {
 	let mut transaction = pool.begin().await?;
@@ -88,13 +94,53 @@ pub async fn insert(
 			mut courses,
 			validated,
 			filesize,
-			created_by,
-			approved_by,
+			mut created_by,
+			mut approved_by,
 			created_on,
 			updated_on,
 		},
 	) in data.iter().enumerate()
 	{
+		if let Err(why) = sqlx::query(&format!(
+			r#"
+			SELECT * FROM players
+			WHERE id = {created_by}
+			"#
+		))
+		.fetch_one(pool)
+		.await
+		{
+			error!("player `{created_by}` not in db. {why:?}");
+			let steam_id64 = created_by as u64 + MAGIC_NUMBER;
+			if let Ok(player) = util::get_player(steam_id64, steam_key, gokz_client).await {
+				let player = migrations::schemas::players::PlayerSchema::try_from(player).unwrap();
+				migrations::schemas::players::insert(&[player], pool).await?;
+				std::thread::sleep(Duration::from_millis(500));
+			} else {
+				created_by = 0;
+			};
+		}
+
+		if let Err(why) = sqlx::query(&format!(
+			r#"
+			SELECT * FROM players
+			WHERE id = {approved_by}
+			"#
+		))
+		.fetch_one(pool)
+		.await
+		{
+			error!("player `{approved_by}` not in db. {why:?}");
+			let steam_id64 = approved_by as u64 + MAGIC_NUMBER;
+			if let Ok(player) = util::get_player(steam_id64, steam_key, gokz_client).await {
+				let player = migrations::schemas::players::PlayerSchema::try_from(player).unwrap();
+				migrations::schemas::players::insert(&[player], pool).await?;
+				std::thread::sleep(Duration::from_millis(500));
+			} else {
+				approved_by = 0;
+			};
+		}
+
 		let created_on = created_on.to_string();
 		let updated_on = updated_on.to_string();
 		let kzgo_map = kzgo_maps

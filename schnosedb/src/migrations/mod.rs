@@ -5,6 +5,7 @@ mod down;
 pub use down::down;
 
 pub mod schemas;
+pub mod util;
 
 use clap::{Subcommand, ValueEnum};
 

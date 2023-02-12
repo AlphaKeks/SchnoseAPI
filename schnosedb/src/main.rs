@@ -72,7 +72,8 @@ async fn main() -> Eyre<()> {
 					.into_iter()
 					.filter_map(|server| ServerSchema::try_from(server).ok())
 					.collect::<Vec<ServerSchema>>();
-				let count = schemas::servers::insert(&data, &pool, &gokz_client).await?;
+				let count =
+					schemas::servers::insert(&data, &pool, &config.steam_key, &gokz_client).await?;
 				info!("Inserted {count} rows into `servers`.");
 			}
 			Schema::Maps => {
@@ -82,7 +83,9 @@ async fn main() -> Eyre<()> {
 					.filter_map(|map| MapSchema::try_from(map).ok())
 					.collect::<Vec<MapSchema>>();
 				let kzgo_maps = gokz_rs::kzgo::KZGO::get_maps(&gokz_client).await?;
-				let count = schemas::maps::insert(&data, kzgo_maps, &pool).await?;
+				let count =
+					schemas::maps::insert(&data, kzgo_maps, &config.steam_key, &gokz_client, &pool)
+						.await?;
 				info!("Inserted {count} rows into `servers`.");
 			}
 			Schema::Courses => {
@@ -98,7 +101,8 @@ async fn main() -> Eyre<()> {
 					.into_iter()
 					.filter_map(|record| RecordSchema::try_from(record).ok())
 					.collect::<Vec<RecordSchema>>();
-				let count = schemas::records::insert(&data, &pool).await?;
+				let count =
+					schemas::records::insert(&data, &pool, &config.steam_key, &gokz_client).await?;
 				info!("Inserted {count} rows into `records`.");
 			}
 		},
@@ -126,4 +130,5 @@ struct Args {
 #[derive(Debug, Serialize, Deserialize)]
 struct Config {
 	mysql_url: String,
+	steam_key: String,
 }

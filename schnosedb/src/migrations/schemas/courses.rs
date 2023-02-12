@@ -22,7 +22,7 @@ pub const fn up() -> &'static str {
 	r#"
 CREATE TABLE
   IF NOT EXISTS courses (
-    id SMALLINT UNSIGNED NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    id SMALLINT UNSIGNED NOT NULL PRIMARY KEY,
     map_id SMALLINT UNSIGNED NOT NULL,
     stage TINYINT UNSIGNED NOT NULL,
     kzt BOOLEAN NOT NULL,
@@ -87,10 +87,11 @@ pub async fn insert(
 			sqlx::query(&format!(
 				r#"
 				INSERT INTO courses
-				  (map_id, stage, kzt, kzt_difficulty, skz, skz_difficulty, vnl, vnl_difficulty)
+				  (id, map_id, stage, kzt, kzt_difficulty, skz, skz_difficulty, vnl, vnl_difficulty)
 				VALUES
-				  ({}, {}, {}, {}, {}, {}, {}, {})
+				  ({}, {}, {}, {}, {}, {}, {}, {}, {})
 				"#,
+				id * 10 + stage as i32,
 				id,
 				stage,
 				!name.starts_with("skz_") && !name.starts_with("vnl_"),
@@ -104,6 +105,7 @@ pub async fn insert(
 			.await?;
 
 			info!("{} ({stage})", i + 1);
+			count += 1;
 		}
 	}
 

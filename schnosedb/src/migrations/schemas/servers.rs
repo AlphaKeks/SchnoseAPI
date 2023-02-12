@@ -1,12 +1,13 @@
 use {
 	crate::{
-		migrations::{self, sanitize},
+		migrations::{self, sanitize, util},
 		MAGIC_NUMBER,
 	},
 	color_eyre::Result as Eyre,
-	gokz_rs::{servers::Server, GlobalAPI},
-	log::info,
+	gokz_rs::servers::Server,
+	log::{error, info},
 	sqlx::{FromRow, MySql, Pool},
+	std::time::Duration,
 };
 
 #[derive(Debug, Clone, FromRow)]
@@ -55,12 +56,13 @@ pub const fn down() -> &'static str {
 pub async fn insert(
 	data: &[ServerSchema],
 	pool: &Pool<MySql>,
+	steam_key: &str,
 	gokz_client: &gokz_rs::Client,
 ) -> Eyre<usize> {
 	let mut transaction = pool.begin().await?;
 
-	for (i, ServerSchema { id, name, owned_by, approved_by }) in data.iter().enumerate() {
-		if sqlx::query(&format!(
+	for (i, ServerSchema { id, name, mut owned_by, mut approved_by }) in data.iter().enumerate() {
+		if let Err(why) = sqlx::query(&format!(
 			r#"
 			SELECT * FROM players
 			WHERE id = {owned_by}
@@ -68,15 +70,36 @@ pub async fn insert(
 		))
 		.fetch_one(pool)
 		.await
-		.is_err()
 		{
-			let steam_id64 = *owned_by as u64 + MAGIC_NUMBER;
-			let Ok(player) = GlobalAPI::get_player(&gokz_rs::prelude::PlayerIdentifier::SteamID64(steam_id64), gokz_client).await else {
-				continue;
+			error!("player `{owned_by}` not in db. {why:?}");
+			let steam_id64 = owned_by as u64 + MAGIC_NUMBER;
+			if let Ok(player) = util::get_player(steam_id64, steam_key, gokz_client).await {
+				let player = migrations::schemas::players::PlayerSchema::try_from(player).unwrap();
+				migrations::schemas::players::insert(&[player], pool).await?;
+				std::thread::sleep(Duration::from_millis(500));
+			} else {
+				owned_by = 0;
 			};
+		}
 
-			let player = migrations::schemas::players::PlayerSchema::try_from(player).unwrap();
-			migrations::schemas::players::insert(&[player], pool).await?;
+		if let Err(why) = sqlx::query(&format!(
+			r#"
+			SELECT * FROM players
+			WHERE id = {approved_by}
+			"#
+		))
+		.fetch_one(pool)
+		.await
+		{
+			error!("player `{approved_by}` not in db. {why:?}");
+			let steam_id64 = approved_by as u64 + MAGIC_NUMBER;
+			if let Ok(player) = util::get_player(steam_id64, steam_key, gokz_client).await {
+				let player = migrations::schemas::players::PlayerSchema::try_from(player).unwrap();
+				migrations::schemas::players::insert(&[player], pool).await?;
+				std::thread::sleep(Duration::from_millis(500));
+			} else {
+				approved_by = 0;
+			};
 		}
 
 		sqlx::query(&format!(

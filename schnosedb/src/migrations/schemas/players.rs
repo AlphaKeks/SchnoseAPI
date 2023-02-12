@@ -1,3 +1,5 @@
+use crate::migrations::util;
+
 use {
 	crate::{migrations::sanitize, MAGIC_NUMBER},
 	color_eyre::Result as Eyre,
@@ -26,6 +28,29 @@ impl TryFrom<Player> for PlayerSchema {
 			id: account_id as u32,
 			name: value.name,
 			is_banned: value.is_banned,
+		})
+	}
+}
+
+impl TryFrom<util::Player> for PlayerSchema {
+	type Error = String;
+
+	fn try_from(value: util::Player) -> Result<Self, Self::Error> {
+		let Some(steam_id64) = value.steamid else {
+			return Err(String::from("no steamid"));
+		};
+
+		let Ok(steamid64) = steam_id64.parse::<u64>() else {
+			return Err(String::from("bad steamid64"))
+		};
+
+		let account_id = steamid64 - MAGIC_NUMBER;
+		Ok(Self {
+			id: account_id as u32,
+			name: value
+				.personaname
+				.unwrap_or_else(|| String::from("unknown")),
+			is_banned: false,
 		})
 	}
 }
