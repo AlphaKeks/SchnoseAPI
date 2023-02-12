@@ -1,7 +1,7 @@
 use {
 	color_eyre::Result as Eyre,
 	gokz_rs::{kzgo::maps::Response as KZGOMap, maps::Map},
-	log::info,
+	log::debug,
 	sqlx::{FromRow, MySql, Pool},
 };
 
@@ -22,7 +22,7 @@ pub const fn up() -> &'static str {
 	r#"
 CREATE TABLE
   IF NOT EXISTS courses (
-    id SMALLINT UNSIGNED NOT NULL PRIMARY KEY,
+    id INT UNSIGNED NOT NULL PRIMARY KEY,
     map_id SMALLINT UNSIGNED NOT NULL,
     stage TINYINT UNSIGNED NOT NULL,
     kzt BOOLEAN NOT NULL,
@@ -49,35 +49,35 @@ pub async fn insert(
 
 	let mut count = 1;
 
-	let mut kzgo_maps = kzgo_maps.into_iter();
+	debug!("{} global maps, {} kzgo maps", global_maps.len(), kzgo_maps.len());
 	let maps = global_maps
 		.into_iter()
 		.map(|map| {
+			debug!("currently @ {}", &map.name);
 			let (kzgo_bonuses, kzgo_sp, kzgo_vp) = kzgo_maps
-				.find(
-					|kzgo_map| {
-						if let Some(name) = &kzgo_map.name {
-							name == &map.name
-						} else {
-							false
-						}
-					},
-				)
+				.iter()
+				.find(|kzgo_map| Some(&map.name) == kzgo_map.name.as_ref())
 				.map(|kzgo_map| {
+					debug!("FOUND {:?} ({})", &kzgo_map.name, &map.name);
 					(
 						kzgo_map.bonuses.unwrap_or(0),
 						kzgo_map.sp.unwrap_or_default(),
 						kzgo_map.vp.unwrap_or_default(),
 					)
 				})
-				.unwrap_or((0, true, true));
+				.unwrap_or_else(|| {
+					debug!("DIDN'T FIND {}", &map.name);
+					(0, false, false)
+				});
 			(map.id, map.name, map.difficulty, kzgo_bonuses, kzgo_sp, kzgo_vp)
 		})
 		.collect::<Vec<_>>();
 
-	for (i, (id, name, difficulty, kzgo_bonuses, kzgo_sp, kzgo_vp)) in maps.into_iter().enumerate()
-	{
-		for stage in 0..kzgo_bonuses {
+	for (id, name, difficulty, kzgo_bonuses, kzgo_sp, kzgo_vp) in maps {
+		for stage in 0..=kzgo_bonuses {
+			let course_id = id * 100 + stage as i32;
+			debug!("map {} with stage {} => course_id {}", id, stage, course_id);
+
 			sqlx::query(&format!(
 				r#"
 				INSERT INTO courses
@@ -85,7 +85,7 @@ pub async fn insert(
 				VALUES
 				  ({}, {}, {}, {}, {}, {}, {}, {}, {})
 				"#,
-				id * 10 + stage as i32,
+				course_id,
 				id,
 				stage,
 				!name.starts_with("skz_") && !name.starts_with("vnl_"),
@@ -97,8 +97,6 @@ pub async fn insert(
 			))
 			.execute(&mut transaction)
 			.await?;
-
-			info!("{} ({stage})", i + 1);
 			count += 1;
 		}
 	}

@@ -62,7 +62,7 @@ pub const fn up() -> &'static str {
 CREATE TABLE
   IF NOT EXISTS records (
     id INT UNSIGNED NOT NULL PRIMARY KEY,
-    course_id SMALLINT UNSIGNED NOT NULL,
+    course_id INT UNSIGNED NOT NULL,
     mode_id TINYINT UNSIGNED NOT NULL,
     player_id INT UNSIGNED NOT NULL,
     server_id SMALLINT UNSIGNED NOT NULL,
