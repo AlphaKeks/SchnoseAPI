@@ -26,11 +26,11 @@ CREATE TABLE
     map_id SMALLINT UNSIGNED NOT NULL,
     stage TINYINT UNSIGNED NOT NULL,
     kzt BOOLEAN NOT NULL,
-    kzt_difficulty TINYINT NOT NULL,
+    kzt_difficulty TINYINT UNSIGNED NOT NULL,
     skz BOOLEAN NOT NULL,
-    skz_difficulty TINYINT NOT NULL,
+    skz_difficulty TINYINT UNSIGNED NOT NULL,
     vnl BOOLEAN NOT NULL,
-    vnl_difficulty TINYINT NOT NULL,
+    vnl_difficulty TINYINT UNSIGNED NOT NULL,
     FOREIGN KEY (map_id) REFERENCES maps (id)
   );
 "#

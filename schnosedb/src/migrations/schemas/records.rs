@@ -220,7 +220,7 @@ pub async fn insert(
 				.fetch_one(pool)
 				.await?;
 
-				let new_id = id * 100 + *__stage as u32;
+				let new_id = id + *__stage as u32;
 
 				sqlx::query(&format!(
 					r#"
