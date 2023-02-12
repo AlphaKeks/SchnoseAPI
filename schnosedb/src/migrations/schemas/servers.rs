@@ -1,7 +1,10 @@
 use {
-	crate::{migrations::sanitize, MAGIC_NUMBER},
+	crate::{
+		migrations::{self, sanitize},
+		MAGIC_NUMBER,
+	},
 	color_eyre::Result as Eyre,
-	gokz_rs::servers::Server,
+	gokz_rs::{servers::Server, GlobalAPI},
 	log::info,
 	sqlx::{FromRow, MySql, Pool},
 };
@@ -49,10 +52,33 @@ pub const fn down() -> &'static str {
 	r#"DROP TABLE servers"#
 }
 
-pub async fn insert(data: &[ServerSchema], pool: &Pool<MySql>) -> Eyre<usize> {
+pub async fn insert(
+	data: &[ServerSchema],
+	pool: &Pool<MySql>,
+	gokz_client: &gokz_rs::Client,
+) -> Eyre<usize> {
 	let mut transaction = pool.begin().await?;
 
 	for (i, ServerSchema { id, name, owned_by, approved_by }) in data.iter().enumerate() {
+		if sqlx::query(&format!(
+			r#"
+			SELECT * FROM players
+			WHERE id = {owned_by}
+			"#
+		))
+		.fetch_one(pool)
+		.await
+		.is_err()
+		{
+			let steam_id64 = *owned_by as u64 + MAGIC_NUMBER;
+			let Ok(player) = GlobalAPI::get_player(&gokz_rs::prelude::PlayerIdentifier::SteamID64(steam_id64), gokz_client).await else {
+				continue;
+			};
+
+			let player = migrations::schemas::players::PlayerSchema::try_from(player).unwrap();
+			migrations::schemas::players::insert(&[player], pool).await?;
+		}
+
 		sqlx::query(&format!(
 			r#"
 			INSERT INTO servers

@@ -72,7 +72,7 @@ async fn main() -> Eyre<()> {
 					.into_iter()
 					.filter_map(|server| ServerSchema::try_from(server).ok())
 					.collect::<Vec<ServerSchema>>();
-				let count = schemas::servers::insert(&data, &pool).await?;
+				let count = schemas::servers::insert(&data, &pool, &gokz_client).await?;
 				info!("Inserted {count} rows into `servers`.");
 			}
 			Schema::Maps => {

@@ -1,5 +1,11 @@
 [workspace]
-members = ["fetching/global_api", "fetching/elastic", "schnosedb", "scraper"]
+members = [
+	"fetching/global_api",
+	"fetching/elastic",
+	"schnosedb",
+	"scraper",
+	"split_files",
+]
 
 [workspace.dependencies]
 # error handling

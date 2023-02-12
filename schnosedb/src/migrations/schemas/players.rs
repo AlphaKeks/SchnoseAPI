@@ -51,7 +51,7 @@ pub async fn insert(data: &[PlayerSchema], pool: &Pool<MySql>) -> Eyre<usize> {
 	for (i, PlayerSchema { id, name, is_banned }) in data.iter().enumerate() {
 		sqlx::query(&format!(
 			r#"
-			INSERT INTO players
+			INSERT IGNORE INTO players
 			  (id, name, is_banned)
 			VALUES
 			  ({}, "{}", {})
