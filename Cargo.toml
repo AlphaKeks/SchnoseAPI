@@ -6,6 +6,7 @@ members = [
 	"crates/split_json_records",
 	"crates/migrations",
 	"database",
+	"api",
 ]
 
 [workspace.dependencies]
