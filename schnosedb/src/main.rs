@@ -29,7 +29,10 @@ async fn main() -> Eyre<()> {
 	color_eyre::install()?;
 	let args = Args::parse();
 
-	std::env::set_var("RUST_LOG", if args.debug { "schnosedb=DEBUG" } else { "schnosedb=INFO" });
+	std::env::set_var(
+		"RUST_LOG",
+		if args.debug { "schnosedb=DEBUG" } else { "schnosedb=INFO" },
+	);
 	env_logger::init();
 
 	let config_file =

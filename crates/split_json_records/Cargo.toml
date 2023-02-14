@@ -1,5 +1,5 @@
 [package]
-name = "split_files"
+name = "split_json_records"
 version = "0.1.0"
 edition = "2021"
 

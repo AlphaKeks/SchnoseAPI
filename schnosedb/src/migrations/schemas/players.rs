@@ -73,7 +73,15 @@ pub const fn down() -> &'static str {
 pub async fn insert(data: &[PlayerSchema], pool: &Pool<MySql>) -> Eyre<usize> {
 	let mut transaction = pool.begin().await?;
 
-	for (i, PlayerSchema { id, name, is_banned }) in data.iter().enumerate() {
+	for (
+		i,
+		PlayerSchema {
+			id,
+			name,
+			is_banned,
+		},
+	) in data.iter().enumerate()
+	{
 		sqlx::query(&format!(
 			r#"
 			INSERT IGNORE INTO players

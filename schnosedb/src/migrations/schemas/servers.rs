@@ -61,7 +61,16 @@ pub async fn insert(
 ) -> Eyre<usize> {
 	let mut transaction = pool.begin().await?;
 
-	for (i, ServerSchema { id, name, mut owned_by, mut approved_by }) in data.iter().enumerate() {
+	for (
+		i,
+		ServerSchema {
+			id,
+			name,
+			mut owned_by,
+			mut approved_by,
+		},
+	) in data.iter().enumerate()
+	{
 		if let Err(why) = sqlx::query(&format!(
 			r#"
 			SELECT * FROM players

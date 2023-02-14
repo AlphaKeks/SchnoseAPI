@@ -48,9 +48,12 @@ async fn main() -> Eyre<()> {
 	let config: Config = toml::from_str(&config_file)?;
 
 	// setup logging
-	std::env::set_var("RUST_LOG", if args.quiet { "global_api=ERROR" } else { "global_api=INFO" });
+	std::env::set_var(
+		"RUST_LOG",
+		if args.quiet { "global_api_scraper=ERROR" } else { "global_api_scraper=INFO" },
+	);
 	if args.debug {
-		std::env::set_var("RUST_LOG", "global_api=DEBUG");
+		std::env::set_var("RUST_LOG", "global_api_scraper=DEBUG");
 	}
 	env_logger::init();
 
@@ -59,7 +62,9 @@ async fn main() -> Eyre<()> {
 		.await?;
 
 	match args.endpoint {
-		Endpoint::Players { start_offset: mut offset } => {
+		Endpoint::Players {
+			start_offset: mut offset,
+		} => {
 			let mut total = 0;
 			let gokz_client = gokz_rs::Client::new();
 

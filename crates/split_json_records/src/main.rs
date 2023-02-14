@@ -46,10 +46,10 @@ fn main() -> Eyre<()> {
 	// setup logging
 	std::env::set_var(
 		"RUST_LOG",
-		if args.quiet { "split_files=ERROR" } else { "split_files=INFO" },
+		if args.quiet { "split_json_records=ERROR" } else { "split_json_records=INFO" },
 	);
 	if args.debug {
-		std::env::set_var("RUST_LOG", "split_files=DEBUG");
+		std::env::set_var("RUST_LOG", "split_json_records=DEBUG");
 	}
 	env_logger::init();
 

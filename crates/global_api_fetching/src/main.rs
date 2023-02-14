@@ -51,9 +51,12 @@ async fn main() -> Eyre<()> {
 	let args = Args::parse();
 
 	// setup logging
-	std::env::set_var("RUST_LOG", if args.quiet { "global_api=ERROR" } else { "global_api=INFO" });
+	std::env::set_var(
+		"RUST_LOG",
+		if args.quiet { "global_api_fetching=ERROR" } else { "global_api_fetching=INFO" },
+	);
 	if args.debug {
-		std::env::set_var("RUST_LOG", "global_api=DEBUG");
+		std::env::set_var("RUST_LOG", "global_api_fetching=DEBUG");
 	}
 	env_logger::init();
 
@@ -83,13 +86,20 @@ async fn main() -> Eyre<()> {
 			limit,
 		} => {
 			players::fetch(
-				start_offset, chunk_size, backwards, limit, &mut buf_writer, &gokz_client,
+				start_offset,
+				chunk_size,
+				backwards,
+				limit,
+				&mut buf_writer,
+				&gokz_client,
 			)
 			.await?
 		}
-		DataType::Records { start_id, backwards, limit } => {
-			records::fetch(start_id, backwards, limit, &mut buf_writer, &gokz_client).await?
-		}
+		DataType::Records {
+			start_id,
+			backwards,
+			limit,
+		} => records::fetch(start_id, backwards, limit, &mut buf_writer, &gokz_client).await?,
 	}
 
 	let took = chrono::Utc::now().timestamp_millis() - start;

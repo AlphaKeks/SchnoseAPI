@@ -67,9 +67,12 @@ async fn main() -> Eyre<()> {
 	let args = Args::parse();
 
 	// setup logging
-	std::env::set_var("RUST_LOG", if args.quiet { "elastic=ERROR" } else { "elastic=INFO" });
+	std::env::set_var(
+		"RUST_LOG",
+		if args.quiet { "elastic_fetching=ERROR" } else { "elastic_fetching=INFO" },
+	);
 	if args.debug {
-		std::env::set_var("RUST_LOG", "elastic=DEBUG");
+		std::env::set_var("RUST_LOG", "elastic_fetching=DEBUG");
 	}
 	env_logger::init();
 

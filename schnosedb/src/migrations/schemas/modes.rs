@@ -52,7 +52,15 @@ pub const fn down() -> &'static str {
 pub async fn insert(data: &[ModeSchema], pool: &Pool<MySql>) -> Eyre<usize> {
 	let mut transaction = pool.begin().await?;
 
-	for (i, ModeSchema { id, name, created_on }) in data.iter().enumerate() {
+	for (
+		i,
+		ModeSchema {
+			id,
+			name,
+			created_on,
+		},
+	) in data.iter().enumerate()
+	{
 		let created_on = created_on.to_string();
 		sqlx::query(&format!(
 			r#"

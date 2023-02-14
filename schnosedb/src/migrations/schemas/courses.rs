@@ -49,7 +49,11 @@ pub async fn insert(
 
 	let mut count = 1;
 
-	debug!("{} global maps, {} kzgo maps", global_maps.len(), kzgo_maps.len());
+	debug!(
+		"{} global maps, {} kzgo maps",
+		global_maps.len(),
+		kzgo_maps.len()
+	);
 	let maps = global_maps
 		.into_iter()
 		.map(|map| {
@@ -69,7 +73,14 @@ pub async fn insert(
 					debug!("DIDN'T FIND {}", &map.name);
 					(0, false, false)
 				});
-			(map.id, map.name, map.difficulty, kzgo_bonuses, kzgo_sp, kzgo_vp)
+			(
+				map.id,
+				map.name,
+				map.difficulty,
+				kzgo_bonuses,
+				kzgo_sp,
+				kzgo_vp,
+			)
 		})
 		.collect::<Vec<_>>();
 

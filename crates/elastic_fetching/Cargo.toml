@@ -1,5 +1,5 @@
 [package]
-name = "elastic"
+name = "elastic_fetching"
 version = "0.1.0"
 edition = "2021"
 
