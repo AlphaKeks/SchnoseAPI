@@ -4,7 +4,7 @@ use {
 	},
 	color_eyre::{eyre::eyre, Result as Eyre},
 	gokz_rs::prelude::*,
-	log::{debug, error, info, trace, warn},
+	log::debug,
 	sqlx::{MySql, Pool},
 };
 
@@ -130,7 +130,7 @@ pub async fn get_player(
 			format!(r#"WHERE p.id = {account_id}"#)
 		}
 		PlayerIdentifier::SteamID64(steam_id64) => {
-			let account_id = steam_id64_to_account_id(*steam_id64);
+			let account_id = steam_id64_to_account_id(*steam_id64)?;
 			format!(r#"WHERE p.id = {account_id}"#)
 		}
 	};
@@ -156,7 +156,7 @@ pub async fn get_player(
 		LIMIT 1
 		"#,
 	);
-	debug!("[get_players] Query: {query}");
+	debug!("[get_player] Query: {query}");
 
 	Ok(get_players(None, Some(query), pool)
 		.await?
@@ -254,7 +254,7 @@ pub async fn get_server_by_owner(
 			PlayerIdentifier::SteamID(steam_id) => {
 				steam_id_to_account_id(&steam_id.to_string()).ok_or(eyre!("BAD STEAMID"))?
 			}
-			PlayerIdentifier::SteamID64(steam_id64) => steam_id64_to_account_id(*steam_id64),
+			PlayerIdentifier::SteamID64(steam_id64) => steam_id64_to_account_id(*steam_id64)?,
 		};
 
 		format!("WHERE owned_by = {owner_id}")
@@ -286,7 +286,7 @@ pub async fn get_server_by_approver(
 			PlayerIdentifier::SteamID(steam_id) => {
 				steam_id_to_account_id(&steam_id.to_string()).ok_or(eyre!("BAD STEAMID"))?
 			}
-			PlayerIdentifier::SteamID64(steam_id64) => steam_id64_to_account_id(*steam_id64),
+			PlayerIdentifier::SteamID64(steam_id64) => steam_id64_to_account_id(*steam_id64)?,
 		};
 
 		format!("WHERE approved_by = {approved_by}")

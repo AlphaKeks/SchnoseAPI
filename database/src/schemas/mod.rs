@@ -1,4 +1,5 @@
 use {
+	color_eyre::{eyre::eyre, Result as Eyre},
 	gokz_rs::prelude::{Mode as GOKZMode, *},
 	serde::{Deserialize, Serialize},
 	sqlx::FromRow,
@@ -8,8 +9,12 @@ pub const MAGIC_STEAM_ID_OFFSET: u64 = 76561197960265728;
 pub const fn account_id_to_steam_id64(account_id: u32) -> u64 {
 	account_id as u64 + MAGIC_STEAM_ID_OFFSET
 }
-pub const fn steam_id64_to_account_id(steam_id64: u64) -> u32 {
-	(steam_id64 - MAGIC_STEAM_ID_OFFSET) as u32
+pub fn steam_id64_to_account_id(steam_id64: u64) -> Eyre<u32> {
+	if steam_id64 > MAGIC_STEAM_ID_OFFSET {
+		Ok((steam_id64 - MAGIC_STEAM_ID_OFFSET) as u32)
+	} else {
+		Err(eyre!("BAD STEAMID64"))
+	}
 }
 pub fn steam_id_to_account_id(steam_id: &str) -> Option<u32> {
 	let (_, parts) = steam_id.split_once('_')?;

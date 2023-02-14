@@ -30,6 +30,7 @@ tokio = { workspace = true }
 
 # SQL
 sqlx = { workspace = true }
+database = { path = "../database" }
 
 # axum
 axum = "0.6"

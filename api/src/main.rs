@@ -2,11 +2,14 @@ use {
 	axum::{routing::get, Router},
 	clap::Parser,
 	color_eyre::Result as Eyre,
-	log::info,
+	log::{debug, info},
 	serde::{Deserialize, Serialize},
 	sqlx::{mysql::MySqlPoolOptions, MySql, Pool},
 	std::{net::SocketAddr, path::PathBuf},
 };
+
+mod models;
+pub(crate) use models::error::Error;
 
 mod routes;
 
@@ -38,11 +41,13 @@ async fn main() -> Eyre<()> {
 		.max_connections(50)
 		.connect(&config.mysql_url)
 		.await?;
+	debug!("Connected to database.");
 
 	let global_state = GlobalState { pool };
 
 	let router = Router::new()
 		.route("/", get(routes::index))
+		.route("/players/:ident", get(routes::players::index))
 		.with_state(global_state);
 
 	axum::Server::bind(&addr)

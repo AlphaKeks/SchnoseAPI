@@ -1,5 +1,4 @@
 use {
-	gokz_rs::prelude::Mode as GOKZMode,
 	serde::{Deserialize, Serialize},
 	sqlx::FromRow,
 };
