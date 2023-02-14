@@ -31,7 +31,7 @@ async fn main() -> Eyre<()> {
 
 	std::env::set_var(
 		"RUST_LOG",
-		if args.debug { "schnosedb=DEBUG" } else { "schnosedb=INFO" },
+		if args.debug { "migrations=DEBUG" } else { "migrations=INFO" },
 	);
 	env_logger::init();
 
