@@ -47,7 +47,7 @@ async fn main() -> Eyre<()> {
 
 	let router = Router::new()
 		.route("/", get(routes::index))
-		.route("/players/:ident", get(routes::players::index))
+		.nest("/api", routes::players::router())
 		.with_state(global_state);
 
 	axum::Server::bind(&addr)
