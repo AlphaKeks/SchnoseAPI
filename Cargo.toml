@@ -35,4 +35,8 @@ gokz_rs = "0.15"
 tokio = { version = "1", features = ["full"] }
 
 # SQL
-sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "mysql"] }
+sqlx = { version = "0.6", features = [
+	"runtime-tokio-rustls",
+	"mysql",
+	"all-types",
+] }

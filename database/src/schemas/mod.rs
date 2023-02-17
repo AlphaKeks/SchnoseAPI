@@ -2,7 +2,7 @@ use {
 	color_eyre::{eyre::eyre, Result as Eyre},
 	gokz_rs::prelude::{Mode as GOKZMode, *},
 	serde::{Deserialize, Serialize},
-	sqlx::FromRow,
+	sqlx::{types::Decimal, FromRow},
 };
 
 pub const MAGIC_STEAM_ID_OFFSET: u64 = 76561197960265728;
@@ -18,10 +18,12 @@ pub fn steam_id64_to_account_id(steam_id64: u64) -> Eyre<u32> {
 }
 pub fn steam_id_to_account_id(steam_id: &str) -> Option<u32> {
 	let (_, parts) = steam_id.split_once('_')?;
-	let mut numbers = parts.split(':');
-	let account_type = numbers.next()?.parse::<u32>().ok()?;
-	let account_number = numbers.next()?.parse::<u32>().ok()?;
-	Some(account_number * 2 + account_type)
+	let numbers = parts
+		.split(':')
+		.skip(1)
+		.filter_map(|num| num.parse::<u32>().ok())
+		.collect::<Vec<_>>();
+	Some(numbers.get(1)? * 2 + numbers.first()?)
 }
 
 pub mod raw;
@@ -54,7 +56,7 @@ impl From<raw::ModeRow> for Mode {
 			name: gokz_mode.api(),
 			name_short: gokz_mode.short(),
 			name_long: gokz_mode.to_string(),
-			created_on: value.created_on,
+			created_on: value.created_on.to_string(),
 		}
 	}
 }
@@ -64,6 +66,22 @@ pub struct Player {
 	pub account_id: u32,
 	pub name: String,
 	pub is_banned: bool,
+	pub total_records: i64,
+	pub kzt_tp_records: Decimal,
+	pub kzt_pro_records: Decimal,
+	pub skz_tp_records: Decimal,
+	pub skz_pro_records: Decimal,
+	pub vnl_tp_records: Decimal,
+	pub vnl_pro_records: Decimal,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FancyPlayer {
+	pub name: String,
+	pub steam_id: SteamID,
+	pub steam_id64: String,
+	pub account_id: u32,
+	pub is_banned: bool,
 	pub total_records: u32,
 	pub kzt_tp_records: u32,
 	pub kzt_pro_records: u32,
@@ -73,20 +91,27 @@ pub struct Player {
 	pub vnl_pro_records: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FancyPlayer {
-	pub account_id: u32,
-	pub steam_id: SteamID,
-	pub steam_id64: u64,
-	pub name: String,
-	pub is_banned: bool,
-	pub total_records: u32,
-	pub kzt_tp_records: u32,
-	pub kzt_pro_records: u32,
-	pub skz_tp_records: u32,
-	pub skz_pro_records: u32,
-	pub vnl_tp_records: u32,
-	pub vnl_pro_records: u32,
+impl TryFrom<Player> for FancyPlayer {
+	type Error = color_eyre::Report;
+
+	fn try_from(value: Player) -> Result<Self, Self::Error> {
+		let steam_id64 = account_id_to_steam_id64(value.account_id);
+		let steam_id = SteamID::from(steam_id64);
+		Ok(FancyPlayer {
+			name: value.name,
+			steam_id,
+			steam_id64: steam_id64.to_string(),
+			account_id: value.account_id,
+			is_banned: value.is_banned,
+			total_records: value.total_records.try_into()?,
+			kzt_tp_records: value.kzt_tp_records.try_into()?,
+			kzt_pro_records: value.kzt_pro_records.try_into()?,
+			skz_tp_records: value.skz_tp_records.try_into()?,
+			skz_pro_records: value.skz_pro_records.try_into()?,
+			vnl_tp_records: value.vnl_tp_records.try_into()?,
+			vnl_pro_records: value.vnl_pro_records.try_into()?,
+		})
+	}
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]

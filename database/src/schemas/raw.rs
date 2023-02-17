@@ -1,13 +1,13 @@
 use {
 	serde::{Deserialize, Serialize},
-	sqlx::FromRow,
+	sqlx::{types::time::PrimitiveDateTime, FromRow},
 };
 
-#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+#[derive(Debug, Clone, FromRow)]
 pub struct ModeRow {
 	pub id: u8,
 	pub name: String,
-	pub created_on: String,
+	pub created_on: PrimitiveDateTime,
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
@@ -25,7 +25,7 @@ pub struct ServerRow {
 	pub approved_by: u32,
 }
 
-#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+#[derive(Debug, Clone, FromRow)]
 pub struct MapRow {
 	pub id: u16,
 	pub name: String,
@@ -34,8 +34,8 @@ pub struct MapRow {
 	pub filesize: u64,
 	pub created_by: u32,
 	pub approved_by: u32,
-	pub created_on: String,
-	pub updated_on: String,
+	pub created_on: PrimitiveDateTime,
+	pub updated_on: PrimitiveDateTime,
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
@@ -51,7 +51,7 @@ pub struct CourseRow {
 	pub vnl_difficulty: u8,
 }
 
-#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+#[derive(Debug, Clone, FromRow)]
 pub struct RecordRow {
 	pub id: u32,
 	pub course_id: u32,
@@ -60,5 +60,5 @@ pub struct RecordRow {
 	pub server_id: u16,
 	pub time: f64,
 	pub teleports: u32,
-	pub created_on: String,
+	pub created_on: PrimitiveDateTime,
 }

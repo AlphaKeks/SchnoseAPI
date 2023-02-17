@@ -1,12 +1,16 @@
 use {
-	crate::schemas::{
-		self, account_id_to_steam_id64, steam_id64_to_account_id, steam_id_to_account_id,
-	},
+	crate::schemas,
 	color_eyre::{eyre::eyre, Result as Eyre},
 	gokz_rs::prelude::*,
 	log::debug,
 	sqlx::{MySql, Pool},
 };
+
+pub enum QueryInput {
+	Query(String),
+	Limit(usize),
+	Filter(String),
+}
 
 pub async fn get_modes(pool: &Pool<MySql>) -> Eyre<Vec<schemas::Mode>> {
 	let query = String::from(r#"SELECT * FROM modes"#);
@@ -24,7 +28,7 @@ pub async fn get_modes(pool: &Pool<MySql>) -> Eyre<Vec<schemas::Mode>> {
 				name: mode.api(),
 				name_short: mode.short(),
 				name_long: mode.to_string(),
-				created_on: row.created_on,
+				created_on: row.created_on.to_string(),
 			}
 		})
 		.collect())
@@ -45,43 +49,35 @@ pub async fn get_mode(mode: Mode, pool: &Pool<MySql>) -> Eyre<schemas::Mode> {
 				name: mode.api(),
 				name_short: mode.short(),
 				name_long: mode.to_string(),
-				created_on: row.created_on,
+				created_on: row.created_on.to_string(),
 			}
 		})?)
 }
 
-pub async fn get_players(
-	limit: Option<u32>,
-	custom_query: Option<String>,
-	pool: &Pool<MySql>,
-) -> Eyre<Vec<schemas::FancyPlayer>> {
-	let query = match custom_query {
-		Some(query) => query,
-		None => {
-			let limit = match limit {
-				Some(limit) => format!("LIMIT {limit}"),
-				None => String::new(),
-			};
-			format!(
-				r#"
-				SELECT
-				  p.id AS account_id,
-				  p.name AS name,
-				  p.is_banned AS is_banned,
-				  COUNT(*) AS total_records,
-				  SUM(r.mode_id = 200 AND r.teleports = 0) AS kzt_tp_records,
-				  SUM(r.mode_id = 200 AND r.teleports > 0) AS kzt_pro_records,
-				  SUM(r.mode_id = 201 AND r.teleports = 0) AS skz_tp_records,
-				  SUM(r.mode_id = 201 AND r.teleports > 0) AS skz_pro_records,
-				  SUM(r.mode_id = 202 AND r.teleports = 0) AS vnl_tp_records,
-				  SUM(r.mode_id = 202 AND r.teleports > 0) AS vnl_pro_records
-				FROM players as p
-				JOIN records AS r ON p.id = r.player_id
-				GROUP BY p.id
-				ORDER BY p.id
-				{limit}
-				"#,
-			)
+const PLAYER_QUERY: &str = r#"
+SELECT
+  p.id AS account_id,
+  p.name AS name,
+  p.is_banned AS is_banned,
+  COUNT(*) AS total_records,
+  SUM(r.mode_id = 200 AND r.teleports > 0) AS kzt_tp_records,
+  SUM(r.mode_id = 200 AND r.teleports = 0) AS kzt_pro_records,
+  SUM(r.mode_id = 201 AND r.teleports > 0) AS skz_tp_records,
+  SUM(r.mode_id = 201 AND r.teleports = 0) AS skz_pro_records,
+  SUM(r.mode_id = 202 AND r.teleports > 0) AS vnl_tp_records,
+  SUM(r.mode_id = 202 AND r.teleports = 0) AS vnl_pro_records
+FROM players as p
+JOIN records AS r ON p.id = r.player_id
+GROUP BY p.id
+ORDER BY p.id
+"#;
+
+pub async fn get_players(input: QueryInput, pool: &Pool<MySql>) -> Eyre<Vec<schemas::FancyPlayer>> {
+	let query = match input {
+		QueryInput::Query(query) => query,
+		QueryInput::Limit(limit) => format!("{PLAYER_QUERY}\nLIMIT {limit}"),
+		QueryInput::Filter(filter) => {
+			format!("SELECT * FROM ({PLAYER_QUERY}) AS player {filter}")
 		}
 	};
 	debug!("[get_players] Query: {query}");
@@ -90,24 +86,9 @@ pub async fn get_players(
 		.fetch_all(pool)
 		.await?
 		.into_iter()
-		.map(|row| {
+		.filter_map(|row| {
 			debug!("Parsing row {row:?}");
-			let steam_id64 = account_id_to_steam_id64(row.account_id);
-			let steam_id = SteamID::from(steam_id64);
-			schemas::FancyPlayer {
-				account_id: row.account_id,
-				steam_id,
-				steam_id64,
-				name: row.name,
-				is_banned: row.is_banned,
-				total_records: row.total_records,
-				kzt_tp_records: row.kzt_tp_records,
-				kzt_pro_records: row.kzt_pro_records,
-				skz_tp_records: row.skz_tp_records,
-				skz_pro_records: row.skz_pro_records,
-				vnl_tp_records: row.vnl_tp_records,
-				vnl_pro_records: row.vnl_pro_records,
-			}
+			schemas::FancyPlayer::try_from(row).ok()
 		})
 		.collect::<Vec<_>>();
 
@@ -116,51 +97,6 @@ pub async fn get_players(
 	} else {
 		Ok(players)
 	}
-}
-
-pub async fn get_player(
-	player: &PlayerIdentifier,
-	pool: &Pool<MySql>,
-) -> Eyre<schemas::FancyPlayer> {
-	let filter = match player {
-		PlayerIdentifier::Name(name) => format!(r#"WHERE p.name LIKE "%{name}%""#),
-		PlayerIdentifier::SteamID(steam_id) => {
-			let account_id =
-				steam_id_to_account_id(&steam_id.to_string()).ok_or(eyre!("Invalid SteamID"))?;
-			format!(r#"WHERE p.id = {account_id}"#)
-		}
-		PlayerIdentifier::SteamID64(steam_id64) => {
-			let account_id = steam_id64_to_account_id(*steam_id64)?;
-			format!(r#"WHERE p.id = {account_id}"#)
-		}
-	};
-
-	let query = format!(
-		r#"
-		SELECT
-		  p.id AS account_id,
-		  p.name AS name,
-		  p.is_banned AS is_banned,
-		  COUNT(*) AS total_records,
-		  SUM(r.mode_id = 200 AND r.teleports = 0) AS kzt_tp_records,
-		  SUM(r.mode_id = 200 AND r.teleports > 0) AS kzt_pro_records,
-		  SUM(r.mode_id = 201 AND r.teleports = 0) AS skz_tp_records,
-		  SUM(r.mode_id = 201 AND r.teleports > 0) AS skz_pro_records,
-		  SUM(r.mode_id = 202 AND r.teleports = 0) AS vnl_tp_records,
-		  SUM(r.mode_id = 202 AND r.teleports > 0) AS vnl_pro_records
-		FROM players as p
-		JOIN records AS r ON p.id = r.player_id
-		{filter}
-		GROUP BY p.id
-		ORDER BY p.id
-		LIMIT 1
-		"#,
-	);
-	debug!("[get_player] Query: {query}");
-
-	Ok(get_players(None, Some(query), pool)
-		.await?
-		.remove(0))
 }
 
 pub async fn get_servers(
@@ -235,70 +171,6 @@ pub async fn get_server_by_name(
 		"#
 	);
 	debug!("[get_server_by_name] Query: {query}");
-
-	Ok(get_servers(None, Some(query), pool)
-		.await?
-		.remove(0))
-}
-
-pub async fn get_server_by_owner(
-	owner: &PlayerIdentifier,
-	pool: &Pool<MySql>,
-) -> Eyre<schemas::FancyServer> {
-	let filter = {
-		let owner_id = match owner {
-			player @ PlayerIdentifier::Name(_) => {
-				let player = get_player(player, pool).await?;
-				player.account_id
-			}
-			PlayerIdentifier::SteamID(steam_id) => {
-				steam_id_to_account_id(&steam_id.to_string()).ok_or(eyre!("BAD STEAMID"))?
-			}
-			PlayerIdentifier::SteamID64(steam_id64) => steam_id64_to_account_id(*steam_id64)?,
-		};
-
-		format!("WHERE owned_by = {owner_id}")
-	};
-
-	let query = format!(
-		r#"
-		SELECT * FROM servers
-		{filter}
-		"#
-	);
-	debug!("[get_server_by_owner] Query: {query}");
-
-	Ok(get_servers(None, Some(query), pool)
-		.await?
-		.remove(0))
-}
-
-pub async fn get_server_by_approver(
-	approver: &PlayerIdentifier,
-	pool: &Pool<MySql>,
-) -> Eyre<schemas::FancyServer> {
-	let filter = {
-		let approved_by = match approver {
-			player @ PlayerIdentifier::Name(_) => {
-				let player = get_player(player, pool).await?;
-				player.account_id
-			}
-			PlayerIdentifier::SteamID(steam_id) => {
-				steam_id_to_account_id(&steam_id.to_string()).ok_or(eyre!("BAD STEAMID"))?
-			}
-			PlayerIdentifier::SteamID64(steam_id64) => steam_id64_to_account_id(*steam_id64)?,
-		};
-
-		format!("WHERE approved_by = {approved_by}")
-	};
-
-	let query = format!(
-		r#"
-		SELECT * FROM servers
-		{filter}
-		"#
-	);
-	debug!("[get_server_by_approver] Query: {query}");
 
 	Ok(get_servers(None, Some(query), pool)
 		.await?
