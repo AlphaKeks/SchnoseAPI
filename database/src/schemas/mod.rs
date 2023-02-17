@@ -137,6 +137,25 @@ pub struct FancyServer {
 	pub approved_by: raw::PlayerRow,
 }
 
+impl From<Server> for FancyServer {
+	fn from(value: Server) -> Self {
+		FancyServer {
+			id: value.id,
+			name: value.name,
+			owned_by: raw::PlayerRow {
+				id: value.owner_id,
+				name: value.owner_name,
+				is_banned: value.owner_is_banned,
+			},
+			approved_by: raw::PlayerRow {
+				id: value.approved_by_id,
+				name: value.approved_by_name,
+				is_banned: value.approved_by_is_banned,
+			},
+		}
+	}
+}
+
 #[derive(Debug, Clone, FromRow)]
 pub struct Map {
 	pub id: u16,

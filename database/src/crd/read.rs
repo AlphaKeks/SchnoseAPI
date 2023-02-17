@@ -127,43 +127,37 @@ pub async fn get_player_raw(
 		.await?)
 }
 
-pub async fn get_servers(
-	limit: Option<u32>,
-	custom_query: Option<String>,
-	pool: &Pool<MySql>,
-) -> Eyre<Vec<schemas::FancyServer>> {
-	let query = match custom_query {
-		Some(query) => query,
-		None => {
-			let limit = match limit {
-				Some(limit) => format!("LIMIT {limit}"),
-				None => String::new(),
-			};
-			format!(r#"SELECT * FROM servers {limit}"#,)
+const SERVER_QUERY: &str = r#"
+SELECT
+  s.id AS id,
+  s.name AS name,
+  o.id AS owner_id,
+  o.name AS owner_name,
+  o.is_banned AS owner_is_banned,
+  a.id AS approved_by_id,
+  a.name AS approved_by_name,
+  a.is_banned AS approved_by_is_banned
+FROM servers AS s
+JOIN players AS o ON o.id = s.owned_by
+JOIN players AS a ON a.id = s.approved_by
+"#;
+
+pub async fn get_servers(input: QueryInput, pool: &Pool<MySql>) -> Eyre<Vec<schemas::FancyServer>> {
+	let query = match input {
+		QueryInput::Query(query) => query,
+		QueryInput::Limit(limit) => format!("{SERVER_QUERY}\nLIMIT {limit}"),
+		QueryInput::Filter(filter) => {
+			format!("SELECT * FROM ({SERVER_QUERY}) AS server {filter}")
 		}
 	};
-	debug!("[get_servers] Query: {query}");
 
 	let servers = sqlx::query_as::<_, schemas::Server>(&query)
 		.fetch_all(pool)
 		.await?
 		.into_iter()
-		.map(|row| {
+		.filter_map(|row| {
 			debug!("Parsing row {row:?}");
-			schemas::FancyServer {
-				id: row.id,
-				name: row.name,
-				owned_by: schemas::raw::PlayerRow {
-					id: row.owner_id,
-					name: row.owner_name,
-					is_banned: row.owner_is_banned,
-				},
-				approved_by: schemas::raw::PlayerRow {
-					id: row.approved_by_id,
-					name: row.approved_by_name,
-					is_banned: row.approved_by_is_banned,
-				},
-			}
+			schemas::FancyServer::try_from(row).ok()
 		})
 		.collect::<Vec<_>>();
 
@@ -172,37 +166,6 @@ pub async fn get_servers(
 	} else {
 		Ok(servers)
 	}
-}
-
-pub async fn get_server_by_id(server_id: u16, pool: &Pool<MySql>) -> Eyre<schemas::FancyServer> {
-	let query = format!(
-		r#"
-		SELECT * FROM servers
-		WHERE id = {server_id}
-		"#
-	);
-	debug!("[get_server_by_id] Query: {query}");
-
-	Ok(get_servers(None, Some(query), pool)
-		.await?
-		.remove(0))
-}
-
-pub async fn get_server_by_name(
-	server_name: &str,
-	pool: &Pool<MySql>,
-) -> Eyre<schemas::FancyServer> {
-	let query = format!(
-		r#"
-		SELECT * FROM servers
-		WHERE name LIKE "%{server_name}%"
-		"#
-	);
-	debug!("[get_server_by_name] Query: {query}");
-
-	Ok(get_servers(None, Some(query), pool)
-		.await?
-		.remove(0))
 }
 
 const MAP_QUERY: &str = r#"
