@@ -51,6 +51,7 @@ async fn main() -> Eyre<()> {
 		.route("/api/modes/:ident", get(routes::modes::ident))
 		.route("/api/players", get(routes::players::index))
 		.route("/api/players/:ident", get(routes::players::ident))
+		.route("/api/maps", get(routes::maps::index))
 		.with_state(global_state);
 
 	axum::Server::bind(&addr)

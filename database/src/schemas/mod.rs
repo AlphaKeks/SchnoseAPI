@@ -2,7 +2,10 @@ use {
 	color_eyre::{eyre::eyre, Result as Eyre},
 	gokz_rs::prelude::{Mode as GOKZMode, *},
 	serde::{Deserialize, Serialize},
-	sqlx::{types::Decimal, FromRow},
+	sqlx::{
+		types::{time::PrimitiveDateTime, Decimal},
+		FromRow,
+	},
 };
 
 pub const MAGIC_STEAM_ID_OFFSET: u64 = 76561197960265728;
@@ -134,7 +137,7 @@ pub struct FancyServer {
 	pub approved_by: raw::PlayerRow,
 }
 
-#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+#[derive(Debug, Clone, FromRow)]
 pub struct Map {
 	pub id: u16,
 	pub name: String,
@@ -148,8 +151,8 @@ pub struct Map {
 	pub approver_id: u32,
 	pub approver_name: String,
 	pub approver_is_banned: bool,
-	pub created_on: String,
-	pub updated_on: String,
+	pub created_on: PrimitiveDateTime,
+	pub updated_on: PrimitiveDateTime,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -166,7 +169,34 @@ pub struct FancyMap {
 	pub updated_on: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl TryFrom<Map> for FancyMap {
+	type Error = gokz_rs::prelude::Error;
+
+	fn try_from(value: Map) -> Result<Self, Self::Error> {
+		Ok(FancyMap {
+			id: value.id,
+			name: value.name,
+			tier: Tier::try_from(value.tier)?,
+			courses: value.courses,
+			validated: value.validated,
+			filesize: value.filesize,
+			created_by: raw::PlayerRow {
+				id: value.creator_id,
+				name: value.creator_name,
+				is_banned: value.creator_is_banned,
+			},
+			approved_by: raw::PlayerRow {
+				id: value.approver_id,
+				name: value.approver_name,
+				is_banned: value.approver_is_banned,
+			},
+			created_on: value.created_on.to_string(),
+			updated_on: value.updated_on.to_string(),
+		})
+	}
+}
+
+#[derive(Debug, Clone)]
 pub struct Course {
 	pub id: u32,
 	pub map: Map,
@@ -179,7 +209,7 @@ pub struct Course {
 	pub vnl_difficulty: Tier,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Record {
 	pub id: u32,
 	pub map: Map,

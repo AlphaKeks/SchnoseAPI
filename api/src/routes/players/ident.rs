@@ -1,7 +1,7 @@
 use {
 	crate::{
 		models::{Response, ResponseBody},
-		GlobalState,
+		Error, GlobalState,
 	},
 	axum::{
 		extract::{Path, State},
@@ -15,6 +15,7 @@ use {
 	},
 	gokz_rs::prelude::*,
 	log::debug,
+	sqlx::{MySql, Pool},
 };
 
 pub(crate) async fn get(
@@ -28,6 +29,16 @@ pub(crate) async fn get(
 	let player_ident = player_ident.parse::<PlayerIdentifier>()?;
 	debug!("> `player_ident`: {player_ident:#?}");
 
+	Ok(Json(ResponseBody {
+		result: get_player(player_ident, &pool).await?,
+		took: (Utc::now().timestamp_nanos() - start) as f64 / 1_000_000f64,
+	}))
+}
+
+pub(crate) async fn get_player(
+	player_ident: PlayerIdentifier,
+	pool: &Pool<MySql>,
+) -> Result<FancyPlayer, Error> {
 	let filter = format!(
 		r#"
 		WHERE player.{}
@@ -47,12 +58,7 @@ pub(crate) async fn get(
 		}
 	);
 
-	let player = get_players(QueryInput::Filter(filter), &pool)
+	Ok(get_players(QueryInput::Filter(filter), &pool)
 		.await?
-		.remove(0);
-
-	Ok(Json(ResponseBody {
-		result: player,
-		took: (Utc::now().timestamp_nanos() - start) as f64 / 1_000_000f64,
-	}))
+		.remove(0))
 }
