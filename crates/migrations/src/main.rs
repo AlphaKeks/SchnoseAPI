@@ -8,7 +8,7 @@ use {
 	migrations::{
 		schemas::{
 			self,
-			mappers::Input as MapperInput,
+			mappers::{InputKind, KZGOInput as MapperInput, ZeroInput},
 			maps::MapSchema,
 			modes::ModeSchema,
 			players::PlayerSchema,
@@ -116,44 +116,100 @@ async fn main() -> Eyre<()> {
 			}
 			Schema::Mappers => {
 				let data = std::fs::read_to_string(data)?;
-				let mappers = serde_json::from_str::<Vec<MapperInput>>(&data)?;
+				let mappers = if let Ok(input) = serde_json::from_str::<Vec<MapperInput>>(&data) {
+					InputKind::KZGO(input)
+				} else if let Ok(input) = serde_json::from_str::<Vec<ZeroInput>>(&data) {
+					InputKind::Zero(input)
+				} else {
+					panic!("BAD INPUT");
+				};
 				let mut illegal_ids = Vec::new();
-				for mapper in &mappers {
-					let Ok(mapper_id) = mapper.mapper_id.parse::<u64>() else {
-						continue;
-					};
+				match mappers {
+					InputKind::KZGO(mappers) => {
+						for mapper in &mappers {
+							let Ok(mapper_id) = mapper.mapper_id.parse::<u64>() else {
+								continue;
+							};
 
-					if mapper_id <= MAGIC_NUMBER {
-						continue;
+							if mapper_id <= MAGIC_NUMBER {
+								continue;
+							}
+
+							let mapper_id = mapper_id - MAGIC_NUMBER;
+
+							if sqlx::query(&format!(
+								"SELECT id FROM players WHERE id = {mapper_id}"
+							))
+							.fetch_one(&pool)
+							.await
+							.is_err()
+							{
+								let Ok(player) =
+									get_player(mapper.mapper_id.parse()?, &config.steam_key, &gokz_client)
+										.await
+										.map(|player| PlayerSchema::try_from(player).unwrap()) else {
+									illegal_ids.push(mapper.mapper_id.clone());
+									continue;
+								};
+								schemas::players::insert(&[player], &pool).await?;
+							}
+						}
+						let count = schemas::mappers::update(
+							InputKind::KZGO(
+								mappers
+									.into_iter()
+									.filter(|mapper| !illegal_ids.contains(&mapper.mapper_id))
+									.collect::<Vec<_>>(),
+							),
+							&pool,
+						)
+						.await?;
+						info!("Updated {count} rows in `maps`.");
 					}
+					InputKind::Zero(mappers) => {
+						for mapper in &mappers {
+							let Ok(mapper_id) = mapper.mapper_steamid64.parse::<u64>() else {
+								continue;
+							};
 
-					let mapper_id = mapper_id - MAGIC_NUMBER;
+							if mapper_id <= MAGIC_NUMBER {
+								continue;
+							}
 
-					if sqlx::query(&format!("SELECT id FROM players WHERE id = {mapper_id}"))
-						.fetch_one(&pool)
-						.await
-						.is_err()
-					{
-						let Ok(player) =
-							get_player(mapper.mapper_id.parse()?, &config.steam_key, &gokz_client)
-								.await
-								.map(|player| PlayerSchema::try_from(player).unwrap()) else {
-							illegal_ids.push(mapper.mapper_id.clone());
-							continue;
-						};
-						schemas::players::insert(&[player], &pool).await?;
+							let mapper_id = mapper_id - MAGIC_NUMBER;
+
+							if sqlx::query(&format!(
+								"SELECT id FROM players WHERE id = {mapper_id}"
+							))
+							.fetch_one(&pool)
+							.await
+							.is_err()
+							{
+								let Ok(player) =
+									get_player(mapper.mapper_steamid64.parse()?, &config.steam_key, &gokz_client)
+										.await
+										.map(|player| PlayerSchema::try_from(player).unwrap()) else {
+									illegal_ids.push(mapper.mapper_steamid64.clone());
+									continue;
+								};
+								schemas::players::insert(&[player], &pool).await?;
+							}
+						}
+						let count = schemas::mappers::update(
+							InputKind::Zero(
+								mappers
+									.into_iter()
+									.filter(|mapper| {
+										!illegal_ids.contains(&mapper.mapper_steamid64)
+									})
+									.collect::<Vec<_>>(),
+							),
+							&pool,
+						)
+						.await?;
+						info!("Updated {count} rows in `maps`.");
 					}
 				}
-
-				let count = schemas::mappers::update(
-					&mappers
-						.into_iter()
-						.filter(|mapper| !illegal_ids.contains(&mapper.mapper_id))
-						.collect::<Vec<_>>(),
-					&pool,
-				)
-				.await?;
-				info!("Updated {count} rows in `maps`.");
 			}
 		},
 	}

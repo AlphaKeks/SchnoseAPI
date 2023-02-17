@@ -7,7 +7,7 @@ use {
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Input {
+pub struct KZGOInput {
 	pub name: String,
 	pub mapper_id: String,
 }
@@ -19,34 +19,89 @@ pub struct Output {
 	pub mapper_id: u32,
 }
 
-pub async fn update(data: &[Input], pool: &Pool<MySql>) -> Eyre<usize> {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZeroInput {
+	pub id: Option<String>,
+	pub name: String,
+	pub difficulty: Option<String>,
+	pub workshop_url: Option<String>,
+	pub mapper_name: Option<String>,
+	pub mapper_steamid64: String,
+}
+
+#[allow(clippy::upper_case_acronyms)]
+pub enum InputKind {
+	KZGO(Vec<KZGOInput>),
+	Zero(Vec<ZeroInput>),
+}
+
+pub async fn update(data: InputKind, pool: &Pool<MySql>) -> Eyre<usize> {
 	let mut transaction = pool.begin().await?;
 
-	for (i, Input { name, mapper_id }) in data.iter().enumerate() {
-		let Ok(mapper_id) = mapper_id.parse::<u64>() else {
-			continue;
-		};
+	match data {
+		InputKind::KZGO(data) => {
+			for (i, KZGOInput { name, mapper_id }) in data.iter().enumerate() {
+				let Ok(mapper_id) = mapper_id.parse::<u64>() else {
+					continue;
+				};
 
-		if mapper_id <= MAGIC_NUMBER {
-			continue;
-		}
+				if mapper_id <= MAGIC_NUMBER {
+					continue;
+				}
 
-		let mapper_id = mapper_id - MAGIC_NUMBER;
+				let mapper_id = mapper_id - MAGIC_NUMBER;
 
-		sqlx::query(&format!(
-			r#"
+				sqlx::query(&format!(
+					r#"
 			UPDATE maps
 			SET created_by = {mapper_id}
 			WHERE name = "{name}"
 			"#
-		))
-		.execute(&mut transaction)
-		.await?;
+				))
+				.execute(&mut transaction)
+				.await?;
 
-		info!("{} / {}", i + 1, data.len());
+				info!("{} / {}", i + 1, data.len());
+			}
+
+			transaction.commit().await?;
+			Ok(data.len())
+		}
+		InputKind::Zero(data) => {
+			for (
+				i,
+				ZeroInput {
+					name,
+					mapper_steamid64,
+					..
+				},
+			) in data.iter().enumerate()
+			{
+				let Ok(mapper_id) = mapper_steamid64.parse::<u64>() else {
+					continue;
+				};
+
+				if mapper_id <= MAGIC_NUMBER {
+					continue;
+				}
+
+				let mapper_id = mapper_id - MAGIC_NUMBER;
+
+				sqlx::query(&format!(
+					r#"
+					UPDATE maps
+					SET created_by = {mapper_id}
+					WHERE name = "{name}"
+					"#
+				))
+				.execute(&mut transaction)
+				.await?;
+
+				info!("{} / {}", i + 1, data.len());
+			}
+
+			transaction.commit().await?;
+			Ok(data.len())
+		}
 	}
-
-	transaction.commit().await?;
-
-	Ok(data.len())
 }
