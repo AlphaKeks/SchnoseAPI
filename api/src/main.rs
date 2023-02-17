@@ -48,10 +48,14 @@ async fn main() -> Eyre<()> {
 	let router = Router::new()
 		.route("/", get(routes::index))
 		.route("/api/modes", get(routes::modes::index))
+		.route("/api/modes/", get(routes::modes::index))
 		.route("/api/modes/:ident", get(routes::modes::ident))
 		.route("/api/players", get(routes::players::index))
+		.route("/api/players/", get(routes::players::index))
 		.route("/api/players/:ident", get(routes::players::ident))
 		.route("/api/maps", get(routes::maps::index))
+		.route("/api/maps/", get(routes::maps::index))
+		.route("/api/maps/:ident", get(routes::maps::ident))
 		.with_state(global_state);
 
 	axum::Server::bind(&addr)

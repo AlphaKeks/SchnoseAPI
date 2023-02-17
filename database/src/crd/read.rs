@@ -256,8 +256,8 @@ pub async fn get_maps(input: QueryInput, pool: &Pool<MySql>) -> Eyre<Vec<schemas
 
 pub async fn get_map(map: &MapIdentifier, pool: &Pool<MySql>) -> Eyre<schemas::FancyMap> {
 	let filter = match map {
-		MapIdentifier::ID(map_id) => format!("WHERE m.id = {map_id}"),
-		MapIdentifier::Name(map_name) => format!(r#"WHERE m.name LIKE "%{map_name}%""#),
+		MapIdentifier::ID(map_id) => format!("WHERE map.id = {map_id}"),
+		MapIdentifier::Name(map_name) => format!(r#"WHERE map.name LIKE "%{map_name}%""#),
 	};
 
 	Ok(get_maps(QueryInput::Filter(filter), pool)

@@ -159,10 +159,10 @@ pub struct Map {
 pub struct FancyMap {
 	pub id: u16,
 	pub name: String,
-	pub tier: Tier,
+	pub tier: u8,
 	pub courses: u8,
 	pub validated: bool,
-	pub filesize: u64,
+	pub filesize: String,
 	pub created_by: raw::PlayerRow,
 	pub approved_by: raw::PlayerRow,
 	pub created_on: String,
@@ -176,10 +176,10 @@ impl TryFrom<Map> for FancyMap {
 		Ok(FancyMap {
 			id: value.id,
 			name: value.name,
-			tier: Tier::try_from(value.tier)?,
+			tier: Tier::try_from(value.tier)? as u8,
 			courses: value.courses,
 			validated: value.validated,
-			filesize: value.filesize,
+			filesize: value.filesize.to_string(),
 			created_by: raw::PlayerRow {
 				id: value.creator_id,
 				name: value.creator_name,
