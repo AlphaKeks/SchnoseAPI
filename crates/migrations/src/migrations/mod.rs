@@ -25,6 +25,7 @@ pub enum Schema {
 	Maps,
 	Courses,
 	Records,
+	Mappers,
 }
 
 pub fn sanitize(input: &str) -> String {

@@ -113,11 +113,11 @@ pub async fn get_player_raw(
 			PlayerIdentifier::SteamID(steam_id) => {
 				let account_id = steam_id_to_account_id(&steam_id.to_string())
 					.ok_or(eyre!("Invalid SteamID"))?;
-				format!(r#"account_id = {account_id}"#)
+				format!(r#"id = {account_id}"#)
 			}
 			PlayerIdentifier::SteamID64(steam_id64) => {
 				let account_id = steam_id64_to_account_id(steam_id64)?;
-				format!(r#"account_id = {account_id}"#)
+				format!(r#"id = {account_id}"#)
 			}
 		}
 	);

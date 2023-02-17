@@ -9,3 +9,5 @@ pub mod maps;
 pub mod courses;
 
 pub mod records;
+
+pub mod mappers;
