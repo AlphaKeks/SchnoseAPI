@@ -70,7 +70,9 @@ pub(crate) async fn get(
 	let filter = format!(
 		"\n{}\nLIMIT {}",
 		filter.replacen("AND", "WHERE", 1),
-		params.limit.unwrap_or(100)
+		params
+			.limit
+			.map_or(100, |limit| limit.min(500))
 	);
 
 	let players = get_players(QueryInput::Filter(filter), &pool).await?;

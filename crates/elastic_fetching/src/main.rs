@@ -54,8 +54,6 @@ struct Args {
 
 const TIME_LIMIT: &str = "60m";
 
-static mut QUIT: bool = false;
-
 #[tokio::main]
 async fn main() -> Eyre<()> {
 	let start = chrono::Utc::now().timestamp_millis();
@@ -148,18 +146,8 @@ async fn main() -> Eyre<()> {
 	write_to_file(&initial_json, &mut buf_writer, false)?;
 	info!("{} / {max_records}", query.len());
 
-	ctrlc::set_handler(|| unsafe {
-		QUIT = true;
-	})?;
-
 	if let Some(scroll_id) = scroll_id {
 		loop {
-			unsafe {
-				if QUIT {
-					break;
-				}
-			}
-
 			let scroll = Scroll::new(&transport, ScrollParts::ScrollId(&scroll_id));
 			let Ok(scroll_result) = elastic_query_with_scroll_id::<_, RawRecord>(
 				json! {
@@ -180,6 +168,7 @@ async fn main() -> Eyre<()> {
 				.into_iter()
 				.filter_map(|raw| Record::try_from(raw).ok())
 				.collect::<Vec<_>>();
+			let len = new_records.len();
 
 			if new_records.is_empty() {
 				info!("no records PogO");
@@ -187,23 +176,24 @@ async fn main() -> Eyre<()> {
 			}
 
 			if let Ok(limit) = max_records.parse::<usize>() {
-				if total + new_records.len() > limit {
+				if total + len > limit {
 					new_records.truncate(limit - total);
 				}
 			}
 
-			total += new_records.len();
+			total += len;
 
-			let mut json = serde_json::to_vec(&new_records)?;
-			_ = initial_json.remove(0);
-			_ = initial_json.pop();
-			json.push(b',');
+			for (i, record) in new_records.into_iter().enumerate() {
+				let last_iteration = i + 1 == len;
+				let mut json = serde_json::to_string(&record)?;
+				json.push_str(",\n");
+				write_to_file(json.as_bytes(), &mut buf_writer, last_iteration)?;
+			}
 
-			write_to_file(&json, &mut buf_writer, true)?;
 			info!("{total} / {max_records}");
 
 			if let Ok(limit) = max_records.parse::<usize>() {
-				if total == limit {
+				if total >= limit {
 					break;
 				}
 			}

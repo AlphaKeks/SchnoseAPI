@@ -3,8 +3,9 @@ members = [
 	"crates/elastic_fetching",
 	"crates/global_api_fetching",
 	"crates/global_api_scraper",
-	"crates/split_json_records",
 	"crates/migrations",
+	"scripts/split_json_records",
+	"scripts/filter_json",
 	"database",
 	"api",
 ]

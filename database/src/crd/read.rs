@@ -227,3 +227,26 @@ pub async fn get_map(map: &MapIdentifier, pool: &Pool<MySql>) -> Eyre<schemas::F
 		.await?
 		.remove(0))
 }
+
+pub async fn get_course(course_id: u32, pool: &Pool<MySql>) -> Eyre<schemas::Course> {
+	let course = sqlx::query_as::<_, schemas::raw::CourseRow>(&format!(
+		r#"
+		SELECT * FROM courses
+		WHERE id = {course_id}
+		"#
+	))
+	.fetch_one(pool)
+	.await?;
+
+	Ok(schemas::Course {
+		id: course.id,
+		map: get_map(&MapIdentifier::ID(course.map_id as i32), pool).await?,
+		stage: course.stage,
+		kzt: course.kzt,
+		kzt_difficulty: Tier::try_from(course.kzt_difficulty)? as u8,
+		skz: course.skz,
+		skz_difficulty: Tier::try_from(course.skz_difficulty)? as u8,
+		vnl: course.vnl,
+		vnl_difficulty: Tier::try_from(course.vnl_difficulty)? as u8,
+	})
+}
