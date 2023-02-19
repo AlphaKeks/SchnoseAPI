@@ -1,3 +1,5 @@
+use crate::schemas::{raw::PlayerRow, FancyMap};
+
 use {
 	crate::schemas::{self, steam_id64_to_account_id, steam_id_to_account_id},
 	color_eyre::{eyre::eyre, Result as Eyre},
@@ -188,6 +190,7 @@ FROM maps AS m
 JOIN courses AS co ON co.map_id = m.id
 JOIN players AS cr ON cr.id = m.created_by
 JOIN players AS ap ON ap.id = m.approved_by
+GROUP BY m.id
 "#;
 
 pub async fn get_maps(input: QueryInput, pool: &Pool<MySql>) -> Eyre<Vec<schemas::FancyMap>> {
@@ -200,15 +203,39 @@ pub async fn get_maps(input: QueryInput, pool: &Pool<MySql>) -> Eyre<Vec<schemas
 	};
 	debug!("[get_maps] Query: {query}");
 
-	let maps = sqlx::query_as::<_, schemas::Map>(&query)
+	let mut maps = Vec::new();
+	for map in sqlx::query_as::<_, schemas::Map>(&query)
 		.fetch_all(pool)
 		.await?
-		.into_iter()
-		.filter_map(|row| {
-			debug!("Parsing row {row:?}");
-			schemas::FancyMap::try_from(row).ok()
+	{
+		debug!("Parsing row {map:?}");
+		let courses = get_courses(map.id, pool).await?;
+
+		let Ok(tier) = Tier::try_from(map.tier) else {
+			continue;
+		};
+
+		maps.push(FancyMap {
+			id: map.id,
+			name: map.name,
+			tier: tier as u8,
+			courses,
+			validated: map.validated,
+			filesize: map.filesize.to_string(),
+			created_by: PlayerRow {
+				id: map.creator_id,
+				name: map.creator_name,
+				is_banned: map.creator_is_banned,
+			},
+			approved_by: PlayerRow {
+				id: map.approver_id,
+				name: map.approver_name,
+				is_banned: map.approver_is_banned,
+			},
+			created_on: map.created_on.to_string(),
+			updated_on: map.updated_on.to_string(),
 		})
-		.collect::<Vec<_>>();
+	}
 
 	if maps.is_empty() {
 		Err(eyre!("NO MAPS FOUND"))
@@ -240,7 +267,7 @@ pub async fn get_course(course_id: u32, pool: &Pool<MySql>) -> Eyre<schemas::Cou
 
 	Ok(schemas::Course {
 		id: course.id,
-		map: get_map(&MapIdentifier::ID(course.map_id as i32), pool).await?,
+		map_id: course.map_id,
 		stage: course.stage,
 		kzt: course.kzt,
 		kzt_difficulty: Tier::try_from(course.kzt_difficulty)? as u8,
@@ -249,4 +276,30 @@ pub async fn get_course(course_id: u32, pool: &Pool<MySql>) -> Eyre<schemas::Cou
 		vnl: course.vnl,
 		vnl_difficulty: Tier::try_from(course.vnl_difficulty)? as u8,
 	})
+}
+
+pub async fn get_courses(map_id: u16, pool: &Pool<MySql>) -> Eyre<Vec<schemas::Course>> {
+	Ok(sqlx::query_as::<_, schemas::raw::CourseRow>(&format!(
+		r#"
+		SELECT * FROM courses
+		WHERE map_id = {map_id}
+		"#
+	))
+	.fetch_all(pool)
+	.await?
+	.into_iter()
+	.filter_map(|course| {
+		Some(schemas::Course {
+			id: course.id,
+			map_id: course.map_id,
+			stage: course.stage,
+			kzt: course.kzt,
+			kzt_difficulty: Tier::try_from(course.kzt_difficulty).ok()? as u8,
+			skz: course.skz,
+			skz_difficulty: Tier::try_from(course.skz_difficulty).ok()? as u8,
+			vnl: course.vnl,
+			vnl_difficulty: Tier::try_from(course.vnl_difficulty).ok()? as u8,
+		})
+	})
+	.collect())
 }

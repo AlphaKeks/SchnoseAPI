@@ -185,7 +185,7 @@ pub struct FancyMap {
 	pub id: u16,
 	pub name: String,
 	pub tier: u8,
-	pub courses: u8,
+	pub courses: Vec<Course>,
 	pub validated: bool,
 	pub filesize: String,
 	pub created_by: raw::PlayerRow,
@@ -194,6 +194,7 @@ pub struct FancyMap {
 	pub updated_on: String,
 }
 
+/*
 impl TryFrom<Map> for FancyMap {
 	type Error = gokz_rs::prelude::Error;
 
@@ -220,11 +221,12 @@ impl TryFrom<Map> for FancyMap {
 		})
 	}
 }
+*/
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct Course {
 	pub id: u32,
-	pub map: FancyMap,
+	pub map_id: u16,
 	pub stage: u8,
 	pub kzt: bool,
 	pub kzt_difficulty: u8,
@@ -235,7 +237,7 @@ pub struct Course {
 }
 
 #[derive(Debug, Clone, FromRow)]
-pub struct Record {
+pub struct FullRecord {
 	pub id: u32,
 
 	pub map_id: u16,
@@ -273,6 +275,211 @@ pub struct Record {
 	pub created_on: PrimitiveDateTime,
 }
 
+#[derive(Debug, Clone, FromRow)]
+pub struct RecordWithoutServer {
+	pub id: u32,
+
+	pub map_id: u16,
+	pub map_name: String,
+	pub map_courses: u8,
+	pub map_validated: bool,
+	pub map_filesize: u64,
+	pub map_created_by_id: u32,
+	pub map_created_by_name: String,
+	pub map_created_by_is_banned: bool,
+	pub map_approved_by_id: u32,
+	pub map_approved_by_name: String,
+	pub map_approved_by_is_banned: bool,
+	pub map_created_on: PrimitiveDateTime,
+	pub map_updated_on: PrimitiveDateTime,
+
+	pub course_id: u32,
+	pub course_stage: u8,
+	pub course_kzt: bool,
+	pub course_kzt_difficulty: u8,
+	pub course_skz: bool,
+	pub course_skz_difficulty: u8,
+	pub course_vnl: bool,
+	pub course_vnl_difficulty: u8,
+
+	pub mode_name: String,
+
+	pub player_name: String,
+	pub player_id: u32,
+
+	pub server_id: u16,
+
+	pub time: f64,
+	pub teleports: u32,
+	pub created_on: PrimitiveDateTime,
+}
+#[derive(Debug, Clone, FromRow)]
+pub struct RecordWithoutPlayer {
+	pub id: u32,
+
+	pub map_id: u16,
+	pub map_name: String,
+	pub map_courses: u8,
+	pub map_validated: bool,
+	pub map_filesize: u64,
+	pub map_created_by_id: u32,
+	pub map_created_by_name: String,
+	pub map_created_by_is_banned: bool,
+	pub map_approved_by_id: u32,
+	pub map_approved_by_name: String,
+	pub map_approved_by_is_banned: bool,
+	pub map_created_on: PrimitiveDateTime,
+	pub map_updated_on: PrimitiveDateTime,
+
+	pub course_id: u32,
+	pub course_stage: u8,
+	pub course_kzt: bool,
+	pub course_kzt_difficulty: u8,
+	pub course_skz: bool,
+	pub course_skz_difficulty: u8,
+	pub course_vnl: bool,
+	pub course_vnl_difficulty: u8,
+
+	pub mode_name: String,
+
+	pub server_name: String,
+
+	pub player_id: u32,
+
+	pub time: f64,
+	pub teleports: u32,
+	pub created_on: PrimitiveDateTime,
+}
+#[derive(Debug, Clone, FromRow)]
+pub struct RecordWithoutServerOrPlayer {
+	pub id: u32,
+
+	pub map_id: u16,
+	pub map_name: String,
+	pub map_courses: u8,
+	pub map_validated: bool,
+	pub map_filesize: u64,
+	pub map_created_by_id: u32,
+	pub map_created_by_name: String,
+	pub map_created_by_is_banned: bool,
+	pub map_approved_by_id: u32,
+	pub map_approved_by_name: String,
+	pub map_approved_by_is_banned: bool,
+	pub map_created_on: PrimitiveDateTime,
+	pub map_updated_on: PrimitiveDateTime,
+
+	pub course_id: u32,
+	pub course_stage: u8,
+	pub course_kzt: bool,
+	pub course_kzt_difficulty: u8,
+	pub course_skz: bool,
+	pub course_skz_difficulty: u8,
+	pub course_vnl: bool,
+	pub course_vnl_difficulty: u8,
+
+	pub mode_name: String,
+
+	pub player_id: u32,
+
+	pub server_id: u16,
+
+	pub time: f64,
+	pub teleports: u32,
+	pub created_on: PrimitiveDateTime,
+}
+#[derive(Debug, Clone, FromRow)]
+pub struct RecordWithoutMap {
+	pub id: u32,
+
+	pub course_id: u32,
+	pub course_stage: u8,
+	pub course_kzt: bool,
+	pub course_kzt_difficulty: u8,
+	pub course_skz: bool,
+	pub course_skz_difficulty: u8,
+	pub course_vnl: bool,
+	pub course_vnl_difficulty: u8,
+
+	pub mode_name: String,
+
+	pub player_name: String,
+	pub player_id: u32,
+
+	pub server_name: String,
+
+	pub time: f64,
+	pub teleports: u32,
+	pub created_on: PrimitiveDateTime,
+}
+#[derive(Debug, Clone, FromRow)]
+pub struct RecordWithoutMapOrServer {
+	pub id: u32,
+
+	pub map_id: u16,
+
+	pub course_id: u32,
+	pub course_stage: u8,
+	pub course_kzt: bool,
+	pub course_kzt_difficulty: u8,
+	pub course_skz: bool,
+	pub course_skz_difficulty: u8,
+	pub course_vnl: bool,
+	pub course_vnl_difficulty: u8,
+
+	pub mode_name: String,
+
+	pub player_name: String,
+	pub player_id: u32,
+
+	pub server_id: u16,
+
+	pub time: f64,
+	pub teleports: u32,
+	pub created_on: PrimitiveDateTime,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct RecordWithoutMapOrPlayer {
+	pub id: u32,
+
+	pub course_id: u32,
+	pub course_stage: u8,
+	pub course_kzt: bool,
+	pub course_kzt_difficulty: u8,
+	pub course_skz: bool,
+	pub course_skz_difficulty: u8,
+	pub course_vnl: bool,
+	pub course_vnl_difficulty: u8,
+
+	pub mode_name: String,
+
+	pub server_name: String,
+
+	pub time: f64,
+	pub teleports: u32,
+	pub created_on: PrimitiveDateTime,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct RecordWithoutMapOrPlayerOrServer {
+	pub id: u32,
+
+	pub course_id: u32,
+	pub course_stage: u8,
+	pub course_kzt: bool,
+	pub course_kzt_difficulty: u8,
+	pub course_skz: bool,
+	pub course_skz_difficulty: u8,
+	pub course_vnl: bool,
+	pub course_vnl_difficulty: u8,
+
+	pub mode_name: String,
+
+	pub time: f64,
+	pub teleports: u32,
+	pub created_on: PrimitiveDateTime,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FancyRecord {
 	pub id: u32,
@@ -284,53 +491,4 @@ pub struct FancyRecord {
 	pub time: f64,
 	pub teleports: u32,
 	pub created_on: String,
-}
-
-impl From<Record> for FancyRecord {
-	fn from(value: Record) -> Self {
-		let map = FancyMap {
-			id: value.map_id,
-			name: value.map_name,
-			tier: value.course_kzt_difficulty,
-			courses: value.map_courses,
-			validated: value.map_validated,
-			filesize: value.map_filesize.to_string(),
-			created_by: raw::PlayerRow {
-				id: value.map_created_by_id,
-				name: value.map_created_by_name,
-				is_banned: value.map_created_by_is_banned,
-			},
-			approved_by: raw::PlayerRow {
-				id: value.map_approved_by_id,
-				name: value.map_approved_by_name,
-				is_banned: value.map_approved_by_is_banned,
-			},
-			created_on: value.map_created_on.to_string(),
-			updated_on: value.map_updated_on.to_string(),
-		};
-		FancyRecord {
-			id: value.id,
-			map: map.clone(),
-			course: Course {
-				id: value.course_id,
-				map,
-				stage: value.course_stage,
-				kzt: value.course_kzt,
-				kzt_difficulty: value.course_kzt_difficulty,
-				skz: value.course_skz,
-				skz_difficulty: value.course_skz_difficulty,
-				vnl: value.course_vnl,
-				vnl_difficulty: value.course_vnl_difficulty,
-			},
-			mode: value.mode_name,
-			player: CompactPlayer {
-				name: value.player_name,
-				steam_id64: (value.player_id as u64 + MAGIC_STEAM_ID_OFFSET).to_string(),
-			},
-			server: value.server_name,
-			time: value.time,
-			teleports: value.teleports,
-			created_on: value.created_on.to_string(),
-		}
-	}
 }

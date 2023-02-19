@@ -8,7 +8,13 @@ use {
 		Json,
 	},
 	chrono::Utc,
-	database::schemas::{FancyRecord, Record},
+	database::{
+		crd::read::get_course,
+		schemas::{
+			raw::PlayerRow, CompactPlayer, Course, FancyMap, FancyRecord, FullRecord,
+			MAGIC_STEAM_ID_OFFSET,
+		},
+	},
 	log::debug,
 };
 
@@ -64,12 +70,67 @@ pub(crate) async fn get(
 		"#,
 	);
 
-	let record = sqlx::query_as::<_, Record>(&query)
+	let record = sqlx::query_as::<_, FullRecord>(&query)
 		.fetch_one(&pool)
 		.await?;
 
+	let mut courses = Vec::new();
+	for course in 0..record.map_courses {
+		let id = record.map_id as u32 * 100 + course as u32;
+		let Ok(course) = get_course(id, &pool).await else {
+				continue;
+			};
+		courses.push(course);
+	}
+
+	let map = FancyMap {
+		id: record.map_id,
+		name: record.map_name,
+		tier: record.course_kzt_difficulty,
+		courses,
+		validated: record.map_validated,
+		filesize: record.map_filesize.to_string(),
+		created_by: PlayerRow {
+			id: record.map_created_by_id,
+			name: record.map_created_by_name,
+			is_banned: record.map_created_by_is_banned,
+		},
+		approved_by: PlayerRow {
+			id: record.map_approved_by_id,
+			name: record.map_approved_by_name,
+			is_banned: record.map_approved_by_is_banned,
+		},
+		created_on: record.map_created_on.to_string(),
+		updated_on: record.map_updated_on.to_string(),
+	};
+
+	let record = FancyRecord {
+		id: record.id,
+		map,
+		course: Course {
+			id: record.course_id,
+			map_id: record.map_id,
+			stage: record.course_stage,
+			kzt: record.course_kzt,
+			kzt_difficulty: record.course_kzt_difficulty,
+			skz: record.course_skz,
+			skz_difficulty: record.course_skz_difficulty,
+			vnl: record.course_vnl,
+			vnl_difficulty: record.course_vnl_difficulty,
+		},
+		mode: record.mode_name,
+		player: CompactPlayer {
+			name: record.player_name,
+			steam_id64: (record.player_id as u64 + MAGIC_STEAM_ID_OFFSET).to_string(),
+		},
+		server: record.server_name,
+		time: record.time,
+		teleports: record.teleports,
+		created_on: record.created_on.to_string(),
+	};
+
 	Ok(Json(ResponseBody {
-		result: FancyRecord::from(record),
+		result: record,
 		took: (Utc::now().timestamp_nanos() - start) as f64 / 1_000_000f64,
 	}))
 }
