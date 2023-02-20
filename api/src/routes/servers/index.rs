@@ -20,10 +20,10 @@ use {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Params {
-	pub(crate) name: Option<String>,
-	pub(crate) owned_by: Option<String>,
-	pub(crate) approved_by: Option<String>,
-	pub(crate) limit: Option<u32>,
+	name: Option<String>,
+	owned_by: Option<String>,
+	approved_by: Option<String>,
+	limit: Option<u32>,
 }
 
 pub(crate) async fn get(

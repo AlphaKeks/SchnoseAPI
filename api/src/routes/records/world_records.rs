@@ -1,18 +1,18 @@
-use database::crd::read::get_map;
-
+/* TODO: make it work
 use {
 	super::{PlayerRowJSON, Record, RecordQuery},
 	crate::{
 		models::{Response, ResponseBody},
 		routes::maps::Course,
-		GlobalState,
+		Error, GlobalState,
 	},
 	axum::{
-		extract::{Path, Query, State},
+		extract::{Query, State},
 		Json,
 	},
+	chrono::NaiveDateTime,
 	database::{
-		crd::read::get_player,
+		crd::read::get_map,
 		schemas::{account_id_to_steam_id64, FancyPlayer},
 	},
 	gokz_rs::prelude::*,
@@ -22,30 +22,23 @@ use {
 };
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct Params {
+pub struct Params {
 	mode: Option<String>,
+	map: Option<String>,
 	stage: Option<u8>,
-	player: Option<String>,
 	has_teleports: Option<bool>,
+	created_after: Option<String>,
+	created_before: Option<String>,
 	limit: Option<u32>,
 }
 
 pub(crate) async fn get(
-	Path(map_ident): Path<String>,
 	Query(params): Query<Params>,
 	State(GlobalState { pool }): State<GlobalState>,
 ) -> Response<Vec<Record>> {
 	let start = Instant::now();
-	debug!("[records::maptop::get]");
-	debug!("> `map_ident`: {map_ident:#?}");
+	debug!("[records::world_records::get]");
 	debug!("> `params`: {params:#?}");
-
-	let map_ident = map_ident.parse::<MapIdentifier>()?;
-	debug!("> `map_ident`: {map_ident:#?}");
-
-	let map_id = get_map(map_ident, &pool)
-		.await
-		.map(|map_row| map_row.id)?;
 
 	let mut filter = String::new();
 
@@ -54,28 +47,56 @@ pub(crate) async fn get(
 		filter.push_str(&format!("AND mode_id = {} ", mode as u8));
 	}
 
-	let stage_filter = params
-		.stage
-		.map_or(String::new(), |stage| format!("AND c.stage = {stage} "));
+	match (params.created_after, params.created_before) {
+		(Some(created_after), None) => {
+			let created_after = NaiveDateTime::parse_from_str(&created_after, "%Y-%m-%dT%H:%M:%S")?
+				.format("%Y-%m-%d %H:%M:%S");
+			filter.push_str(&format!(r#"AND created_on > "{created_after}" "#));
+		}
+		(None, Some(created_before)) => {
+			let created_before =
+				NaiveDateTime::parse_from_str(&created_before, "%Y-%m-%dT%H:%M:%S")?
+					.format("%Y-%m-%d %H:%M:%S");
+			filter.push_str(&format!(r#"AND created_on < "{created_before}" "#));
+		}
+		(Some(created_after), Some(created_before)) => {
+			let created_after = NaiveDateTime::parse_from_str(&created_after, "%Y-%m-%dT%H:%M:%S")?;
+			let created_before =
+				NaiveDateTime::parse_from_str(&created_before, "%Y-%m-%dT%H:%M:%S")?;
 
-	if let Some(player) = params.player {
-		let player_ident = player.parse::<PlayerIdentifier>()?;
-		let player = get_player(player_ident, &pool).await?;
-		filter.push_str(&format!("AND player_id = {} ", player.id));
+			if created_after.timestamp() > created_before.timestamp() {
+				return Err(Error::DateRange);
+			}
+
+			filter.push_str(&format!(
+				r#"AND created_on > "{}" AND created_on < "{}" "#,
+				created_after.format("%Y-%m-%d %H:%M:%S"),
+				created_before.format("%Y-%m-%d %H:%M:%S")
+			));
+		}
+		_ => {}
+	};
+
+	if let Some(map) = params.map {
+		let map_ident = map.parse::<MapIdentifier>()?;
+		let map = get_map(map_ident, &pool).await?;
+		filter.push_str(&format!("AND c.map_id = {} ", map.id));
+	}
+
+	if let Some(stage) = params.stage {
+		filter.push_str(&format!("AND c.stage = {stage} "));
 	}
 
 	if let Some(has_teleports) = params.has_teleports {
 		filter.push_str(&format!(
-			"AND teleports {} 0 ",
+			"AND r.teleports {} 0 ",
 			if has_teleports { ">" } else { "=" }
 		));
 	}
 
-	filter = filter.replacen("AND", "WHERE", 1);
-
 	let limit = params
 		.limit
-		.map_or(100, |limit| limit.min(250));
+		.map_or(10, |limit| limit.min(100));
 
 	let mut result = Vec::new();
 	for record_query in sqlx::query_as::<_, RecordQuery>(&format!(
@@ -84,36 +105,36 @@ pub(crate) async fn get(
 		  r.id AS id,
 		  ma.name AS map_name,
 		  JSON_OBJECT(
-		    "id", c.id,
-		    "stage", c.stage,
-		    "kzt", c.kzt,
-		    "kzt_difficulty", c.kzt_difficulty,
-		    "skz", c.skz,
-		    "skz_difficulty", c.skz_difficulty,
-		    "vnl", c.vnl,
-		    "vnl_difficulty", c.vnl_difficulty
+			"id", c.id,
+			"stage", c.stage,
+			"kzt", c.kzt,
+			"kzt_difficulty", c.kzt_difficulty,
+			"skz", c.skz,
+			"skz_difficulty", c.skz_difficulty,
+			"vnl", c.vnl,
+			"vnl_difficulty", c.vnl_difficulty
 		  ) AS course,
 		  mo.name AS mode,
 		  JSON_OBJECT(
-		    "id", p.id,
-		    "name", p.name,
-		    "is_banned", p.is_banned
+			"id", p.id,
+			"name", p.name,
+			"is_banned", p.is_banned
 		  ) AS player,
 		  s.name AS server_name,
 		  r.time AS time,
 		  r.teleports AS teleports,
 		  r.created_on AS created_on
 		FROM (
-		  SELECT * FROM records
+		  SELECT *, MIN(time) FROM records
 		  {filter}
-		  ORDER BY created_on DESC
+		  GROUP BY course_id, mode_id
 		) AS r
-		JOIN courses AS c ON c.id = r.course_id {stage_filter}
-		JOIN maps AS ma ON ma.id = c.map_id AND ma.id = {map_id}
+		JOIN courses AS c ON c.id = r.course_id
+		JOIN maps AS ma ON ma.id = c.map_id
 		JOIN modes AS mo ON mo.id = r.mode_id
 		JOIN players AS p ON p.id = r.player_id AND p.is_banned = 0
 		JOIN servers AS s ON s.id = r.server_id
-		ORDER BY r.time, r.created_on DESC
+		ORDER BY r.created_on DESC, r.time ASC
 		LIMIT {limit}
 		"#,
 	))
@@ -155,3 +176,4 @@ pub(crate) async fn get(
 		took: (Instant::now() - start).as_nanos(),
 	}))
 }
+*/

@@ -15,9 +15,9 @@ use {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Params {
-	pub(crate) is_banned: Option<bool>,
-	pub(crate) limit: Option<u32>,
-	pub(crate) offset: Option<i32>,
+	is_banned: Option<bool>,
+	limit: Option<u32>,
+	offset: Option<i32>,
 }
 
 pub(crate) async fn get(

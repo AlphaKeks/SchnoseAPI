@@ -4,6 +4,7 @@ use {
 		response::{IntoResponse, Response},
 		Json,
 	},
+	chrono::ParseError,
 	log::{error, warn},
 	serde::{Deserialize, Serialize},
 	std::fmt::Display,
@@ -18,6 +19,8 @@ pub(crate) enum Error {
 	GOKZ { message: String },
 	Input { message: String, expected: String },
 	JSON,
+	Date,
+	DateRange,
 }
 
 impl Display for Error {
@@ -29,6 +32,8 @@ impl Display for Error {
 			}
 			Error::Input { message, expected } => format!("{message} Expected `{expected}`."),
 			Error::JSON => String::from("Failed to parse JSON."),
+			Error::Date => String::from("Invalid Date format."),
+			Error::DateRange => String::from("Invalid Date range."),
 		})
 	}
 }
@@ -92,5 +97,11 @@ impl From<color_eyre::Report> for Error {
 		Self::Custom {
 			message: value.to_string(),
 		}
+	}
+}
+
+impl From<ParseError> for Error {
+	fn from(_: ParseError) -> Self {
+		Self::Date
 	}
 }

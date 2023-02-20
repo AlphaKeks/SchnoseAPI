@@ -16,7 +16,7 @@ use {
 };
 
 #[derive(Debug, Deserialize)]
-pub struct Params {
+pub(crate) struct Params {
 	tier: Option<u8>,
 	courses: Option<u8>,
 	validated: Option<bool>,

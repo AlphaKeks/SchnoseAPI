@@ -1,18 +1,17 @@
-use database::crd::read::get_map;
-
 use {
 	super::{PlayerRowJSON, Record, RecordQuery},
 	crate::{
 		models::{Response, ResponseBody},
 		routes::maps::Course,
-		GlobalState,
+		Error, GlobalState,
 	},
 	axum::{
 		extract::{Path, Query, State},
 		Json,
 	},
+	chrono::NaiveDateTime,
 	database::{
-		crd::read::get_player,
+		crd::read::{get_map, get_player},
 		schemas::{account_id_to_steam_id64, FancyPlayer},
 	},
 	gokz_rs::prelude::*,
@@ -22,11 +21,13 @@ use {
 };
 
 #[derive(Debug, Deserialize)]
-pub struct Params {
+pub(crate) struct Params {
 	mode: Option<String>,
 	stage: Option<u8>,
 	map: Option<String>,
 	has_teleports: Option<bool>,
+	created_after: Option<String>,
+	created_before: Option<String>,
 	limit: Option<u32>,
 }
 
@@ -43,10 +44,6 @@ pub(crate) async fn get(
 	let player_ident = player_ident.parse::<PlayerIdentifier>()?;
 	debug!("> `player_ident`: {player_ident:#?}");
 
-	let player_id = get_player(player_ident, &pool)
-		.await
-		.map(|player_row| player_row.id)?;
-
 	let mut filter = String::new();
 
 	if let Some(mode) = params.mode {
@@ -57,6 +54,40 @@ pub(crate) async fn get(
 	let stage_filter = params
 		.stage
 		.map_or(String::new(), |stage| format!("AND c.stage = {stage} "));
+
+	match (params.created_after, params.created_before) {
+		(Some(created_after), None) => {
+			let created_after = NaiveDateTime::parse_from_str(&created_after, "%Y-%m-%dT%H:%M:%S")?
+				.format("%Y-%m-%d %H:%M:%S");
+			filter.push_str(&format!(r#"AND created_on > "{created_after}" "#));
+		}
+		(None, Some(created_before)) => {
+			let created_before =
+				NaiveDateTime::parse_from_str(&created_before, "%Y-%m-%dT%H:%M:%S")?
+					.format("%Y-%m-%d %H:%M:%S");
+			filter.push_str(&format!(r#"AND created_on < "{created_before}" "#));
+		}
+		(Some(created_after), Some(created_before)) => {
+			let created_after = NaiveDateTime::parse_from_str(&created_after, "%Y-%m-%dT%H:%M:%S")?;
+			let created_before =
+				NaiveDateTime::parse_from_str(&created_before, "%Y-%m-%dT%H:%M:%S")?;
+
+			if created_after.timestamp() > created_before.timestamp() {
+				return Err(Error::DateRange);
+			}
+
+			filter.push_str(&format!(
+				r#"AND created_on > "{}" AND created_on < "{}" "#,
+				created_after.format("%Y-%m-%d %H:%M:%S"),
+				created_before.format("%Y-%m-%d %H:%M:%S")
+			));
+		}
+		_ => {}
+	};
+
+	let player_id = get_player(player_ident, &pool)
+		.await
+		.map(|player_row| player_row.id)?;
 
 	let map_filter = if let Some(map) = params.map {
 		let map_ident = map.parse::<MapIdentifier>()?;
