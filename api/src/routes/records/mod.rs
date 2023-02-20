@@ -9,9 +9,13 @@ use {
 mod id;
 pub(crate) use id::get as id;
 
+mod recent;
+pub(crate) use recent::get as recent;
+
 #[derive(Debug, Clone, FromRow)]
 pub struct RecordQuery {
 	pub id: u32,
+	pub map_name: String,
 	pub course: String,
 	pub mode: String,
 	pub player: String,
@@ -24,6 +28,7 @@ pub struct RecordQuery {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Record {
 	pub id: u32,
+	pub map_name: String,
 	pub course: Course,
 	pub mode: String,
 	pub player: FancyPlayer,

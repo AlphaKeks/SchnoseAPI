@@ -3,7 +3,7 @@ use {
 	crate::{
 		models::{Response, ResponseBody},
 		routes::maps::Course,
-		GlobalState,
+		Error, GlobalState,
 	},
 	axum::{
 		extract::{Path, State},
@@ -27,6 +27,7 @@ pub(crate) async fn get(
 		r#"
 		SELECT
 		  r.id AS id,
+		  ma.name AS map_name,
 		  JSON_OBJECT(
 		    "id", c.id,
 		    "stage", c.stage,
@@ -37,7 +38,7 @@ pub(crate) async fn get(
 		    "vnl", c.vnl,
 		    "vnl_difficulty", c.vnl_difficulty
 		  ) AS course,
-		  m.name AS mode,
+		  mo.name AS mode,
 		  JSON_OBJECT(
 		    "id", p.id,
 		    "name", p.name,
@@ -49,7 +50,8 @@ pub(crate) async fn get(
 		  r.created_on AS created_on
 		FROM records AS r
 		JOIN courses AS c ON c.id = r.course_id
-		JOIN modes AS m ON m.id = r.mode_id
+		JOIN maps AS ma ON ma.id = c.map_id
+		JOIN modes AS mo ON mo.id = r.mode_id
 		JOIN players AS p ON p.id = r.player_id
 		JOIN servers AS s ON s.id = r.server_id
 		WHERE r.id = {record_id}
@@ -58,13 +60,11 @@ pub(crate) async fn get(
 	.fetch_one(&pool)
 	.await?;
 
-	let course = serde_json::from_str::<Course>(&record_query.course)
-		// .map_err(|_| Error::JSON)?;
-		.unwrap();
+	let course = serde_json::from_str::<Course>(&record_query.course).map_err(|_| Error::JSON)?;
 	let player = {
-		let player = serde_json::from_str::<PlayerRowJSON>(&record_query.player)
-			// .map_err(|_| Error::JSON)?;
-			.unwrap();
+		let player =
+			serde_json::from_str::<PlayerRowJSON>(&record_query.player).map_err(|_| Error::JSON)?;
+
 		let steam_id64 = account_id_to_steam_id64(player.id);
 		let steam_id = SteamID::from(steam_id64);
 		FancyPlayer {
@@ -78,6 +78,7 @@ pub(crate) async fn get(
 
 	let result = Record {
 		id: record_query.id,
+		map_name: record_query.map_name,
 		course,
 		mode: record_query.mode,
 		player,
