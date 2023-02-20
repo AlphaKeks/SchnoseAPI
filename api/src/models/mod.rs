@@ -11,5 +11,5 @@ pub(crate) type Response<T> = Result<Json<ResponseBody<T>>, Error>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ResponseBody<T> {
 	pub(crate) result: T,
-	pub(crate) took: f64,
+	pub(crate) took: u128,
 }
