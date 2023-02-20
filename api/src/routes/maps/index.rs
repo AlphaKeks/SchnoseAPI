@@ -1,4 +1,5 @@
 use {
+	super::{Course, Map, MapRow},
 	crate::{
 		models::{Response, ResponseBody},
 		GlobalState,
@@ -10,8 +11,7 @@ use {
 	database::{crd::read::*, schemas::account_id_to_steam_id64},
 	gokz_rs::prelude::*,
 	log::debug,
-	serde::{Deserialize, Serialize},
-	sqlx::{types::time::PrimitiveDateTime, FromRow},
+	serde::Deserialize,
 	std::time::Instant,
 };
 
@@ -23,38 +23,6 @@ pub struct Params {
 	created_by: Option<String>,
 	approved_by: Option<String>,
 	limit: Option<u32>,
-}
-
-#[derive(Debug, FromRow)]
-struct MapQuery {
-	id: u16,
-	name: String,
-	tier: u8,
-	courses: i64,
-	validated: bool,
-	mapper_name: String,
-	created_by: u32,
-	approver_name: String,
-	approved_by: u32,
-	filesize: u64,
-	created_on: PrimitiveDateTime,
-	updated_on: PrimitiveDateTime,
-}
-
-#[derive(Debug, Serialize)]
-pub struct Map {
-	id: u16,
-	name: String,
-	tier: u8,
-	courses: u8,
-	validated: bool,
-	mapper_name: String,
-	mapper_steam_id64: String,
-	approver_name: String,
-	approver_steam_id64: String,
-	filesize: String,
-	created_on: String,
-	updated_on: String,
 }
 
 pub(crate) async fn get(
@@ -99,13 +67,24 @@ pub(crate) async fn get(
 			.map_or(1500, |limit| limit.min(1500))
 	);
 
-	let result = sqlx::query_as::<_, MapQuery>(&format!(
+	let result = sqlx::query_as::<_, MapRow>(&format!(
 		r#"
 		SELECT
 		  m.id AS id,
 		  m.name AS name,
 		  c.kzt_difficulty AS tier,
-		  COUNT(c.map_id) AS courses,
+		  JSON_ARRAYAGG(
+		    JSON_OBJECT(
+		      "id", c.id,
+		      "stage", c.stage,
+		      "kzt", c.kzt,
+		      "kzt_difficulty", c.kzt_difficulty,
+		      "skz", c.skz,
+		      "skz_difficulty", c.skz_difficulty,
+		      "vnl", c.vnl,
+		      "vnl_difficulty", c.vnl_difficulty
+		    )
+		  ) AS courses,
 		  m.validated AS validated,
 		  mapper.name AS mapper_name,
 		  m.created_by,
@@ -126,19 +105,22 @@ pub(crate) async fn get(
 	.fetch_all(&pool)
 	.await?
 	.into_iter()
-	.map(|map_query| Map {
-		id: map_query.id,
-		name: map_query.name,
-		tier: map_query.tier,
-		courses: map_query.courses as u8,
-		validated: map_query.validated,
-		mapper_name: map_query.mapper_name,
-		mapper_steam_id64: account_id_to_steam_id64(map_query.created_by).to_string(),
-		approver_name: map_query.approver_name,
-		approver_steam_id64: account_id_to_steam_id64(map_query.approved_by).to_string(),
-		filesize: map_query.filesize.to_string(),
-		created_on: map_query.created_on.to_string(),
-		updated_on: map_query.updated_on.to_string(),
+	.filter_map(|map_row| {
+		let courses = serde_json::from_str::<Vec<Course>>(&map_row.courses).ok()?;
+		Some(Map {
+			id: map_row.id,
+			name: map_row.name,
+			tier: courses[0].kzt_difficulty,
+			courses,
+			validated: map_row.validated,
+			mapper_name: map_row.mapper_name,
+			mapper_steam_id64: account_id_to_steam_id64(map_row.created_by).to_string(),
+			approver_name: map_row.approver_name,
+			approver_steam_id64: account_id_to_steam_id64(map_row.approved_by).to_string(),
+			filesize: map_row.filesize.to_string(),
+			created_on: map_row.created_on.to_string(),
+			updated_on: map_row.updated_on.to_string(),
+		})
 	})
 	.collect();
 

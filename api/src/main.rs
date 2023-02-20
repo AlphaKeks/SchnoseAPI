@@ -12,6 +12,7 @@ mod models;
 pub(crate) use models::error::Error;
 
 mod routes;
+mod util;
 
 #[tokio::main]
 async fn main() -> Eyre<()> {
@@ -59,6 +60,7 @@ async fn main() -> Eyre<()> {
 		.route("/api/maps/:ident", get(routes::maps::ident))
 		.route("/api/maps/", get(routes::maps::index))
 		.route("/api/maps", get(routes::maps::index))
+		.route("/api/records/:id", get(routes::records::id))
 		.with_state(global_state);
 
 	axum::Server::bind(&addr)

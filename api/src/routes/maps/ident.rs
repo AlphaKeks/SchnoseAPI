@@ -1,62 +1,18 @@
 use {
+	super::{Course, Map, MapRow},
 	crate::{
 		models::{Response, ResponseBody},
-		GlobalState,
+		Error, GlobalState,
 	},
 	axum::{
 		extract::{Path, State},
 		Json,
 	},
-	database::schemas::{account_id_to_steam_id64, CourseRow},
+	database::schemas::account_id_to_steam_id64,
 	gokz_rs::prelude::*,
 	log::debug,
-	serde::Serialize,
-	sqlx::{types::time::PrimitiveDateTime, FromRow},
 	std::time::Instant,
 };
-
-#[derive(Debug, Clone, FromRow)]
-pub struct MapRow {
-	pub id: u16,
-	pub name: String,
-	pub courses: u8,
-	pub validated: bool,
-	pub filesize: u64,
-	pub mapper_name: String,
-	pub created_by: u32,
-	pub approver_name: String,
-	pub approved_by: u32,
-	pub created_on: PrimitiveDateTime,
-	pub updated_on: PrimitiveDateTime,
-}
-
-#[derive(Debug, Serialize)]
-struct Course {
-	id: u32,
-	stage: u8,
-	kzt: bool,
-	kzt_difficulty: u8,
-	skz: bool,
-	skz_difficulty: u8,
-	vnl: bool,
-	vnl_difficulty: u8,
-}
-
-#[derive(Debug, Serialize)]
-pub struct Map {
-	id: u16,
-	name: String,
-	tier: u8,
-	courses: Vec<Course>,
-	validated: bool,
-	pub mapper_name: String,
-	pub mapper_steam_id64: String,
-	pub approver_name: String,
-	pub approver_steam_id64: String,
-	filesize: String,
-	created_on: String,
-	updated_on: String,
-}
 
 pub(crate) async fn get(
 	Path(map_ident): Path<String>,
@@ -83,7 +39,18 @@ pub(crate) async fn get(
 		SELECT
 		  map.id,
 		  map.name,
-		  map.courses,
+		  JSON_ARRAYAGG(
+		    JSON_OBJECT(
+		      "id", c.id,
+		      "stage", c.stage,
+		      "kzt", c.kzt,
+		      "kzt_difficulty", c.kzt_difficulty,
+		      "skz", c.skz,
+		      "skz_difficulty", c.skz_difficulty,
+		      "vnl", c.vnl,
+		      "vnl_difficulty", c.vnl_difficulty
+		    )
+		  ) AS courses,
 		  map.validated,
 		  map.filesize,
 		  mapper.name AS mapper_name,
@@ -93,6 +60,7 @@ pub(crate) async fn get(
 		  map.created_on,
 		  map.updated_on
 		FROM maps AS map
+		JOIN courses AS c ON c.map_id = map.id
 		JOIN players AS mapper ON mapper.id = map.created_by
 		JOIN players AS approver ON approver.id = map.approved_by
 		WHERE {filter}
@@ -102,28 +70,7 @@ pub(crate) async fn get(
 	.fetch_one(&pool)
 	.await?;
 
-	// TODO: Do this in the initial SQL query directly?
-	let courses = sqlx::query_as::<_, CourseRow>(&format!(
-		r#"
-		SELECT * FROM courses
-		WHERE map_id = {}
-		"#,
-		map_row.id,
-	))
-	.fetch_all(&pool)
-	.await?
-	.into_iter()
-	.map(|course_row| Course {
-		id: course_row.id,
-		stage: course_row.stage,
-		kzt: course_row.kzt,
-		kzt_difficulty: course_row.kzt_difficulty,
-		skz: course_row.skz,
-		skz_difficulty: course_row.skz_difficulty,
-		vnl: course_row.vnl,
-		vnl_difficulty: course_row.vnl_difficulty,
-	})
-	.collect::<Vec<_>>();
+	let courses = serde_json::from_str::<Vec<Course>>(&map_row.courses).map_err(|_| Error::JSON)?;
 
 	let result = Map {
 		id: map_row.id,

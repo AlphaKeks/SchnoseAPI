@@ -6,6 +6,7 @@ use {
 	},
 	log::{error, warn},
 	serde::{Deserialize, Serialize},
+	std::fmt::Display,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -16,22 +17,28 @@ pub(crate) enum Error {
 	Database { message: String },
 	GOKZ { message: String },
 	Input { message: String, expected: String },
+	JSON,
+}
+
+impl Display for Error {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_str(&match self {
+			Error::Unknown => String::from("Unknown error occurred."),
+			Error::Custom { message } | Error::Database { message } | Error::GOKZ { message } => {
+				message.to_owned()
+			}
+			Error::Input { message, expected } => format!("{message} Expected `{expected}`."),
+			Error::JSON => String::from("Failed to parse JSON."),
+		})
+	}
 }
 
 impl IntoResponse for Error {
 	fn into_response(self) -> Response {
-		match self {
-			Error::Unknown => (
-				StatusCode::INTERNAL_SERVER_ERROR,
-				Json(String::from("Unknown error occurred.")),
-			),
-			Error::Custom { message } | Error::Database { message } | Error::GOKZ { message } => {
-				(StatusCode::INTERNAL_SERVER_ERROR, Json(message))
-			}
-			Error::Input { message, expected } => (
-				StatusCode::BAD_REQUEST,
-				Json(format!("{message} Expected `{expected}`.")),
-			),
+		if let Error::Input { .. } = self {
+			(StatusCode::BAD_REQUEST, Json(self.to_string()))
+		} else {
+			(StatusCode::INTERNAL_SERVER_ERROR, Json(self.to_string()))
 		}
 		.into_response()
 	}
