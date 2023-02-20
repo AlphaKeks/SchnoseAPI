@@ -24,6 +24,7 @@ pub struct RecentQuery {
 	mode: Option<String>,
 	player: Option<String>,
 	map: Option<String>,
+	stage: Option<u8>,
 	has_teleports: Option<bool>,
 	limit: Option<u32>,
 }
@@ -33,7 +34,7 @@ pub(crate) async fn get(
 	State(GlobalState { pool }): State<GlobalState>,
 ) -> Response<Vec<Record>> {
 	let start = Instant::now();
-	debug!("[records::recent::get]");
+	debug!("[records::get]");
 	debug!("> `params`: {params:#?}");
 
 	let mut filter = String::new();
@@ -55,6 +56,10 @@ pub(crate) async fn get(
 		filter.push_str(&format!("AND c.map_id = {} ", map.id));
 	}
 
+	if let Some(stage) = params.stage {
+		filter.push_str(&format!("AND c.stage = {stage} "));
+	}
+
 	if let Some(has_teleports) = params.has_teleports {
 		filter.push_str(&format!(
 			"AND r.teleports {} 0 ",
@@ -62,11 +67,11 @@ pub(crate) async fn get(
 		));
 	}
 
+	filter = filter.replacen("AND", "WHERE", 1);
+
 	let limit = params
 		.limit
 		.map_or(10, |limit| limit.min(100));
-
-	filter = filter.replacen("AND", "WHERE", 1);
 
 	let mut result = Vec::new();
 	for record_query in sqlx::query_as::<_, RecordQuery>(&format!(
@@ -103,7 +108,7 @@ pub(crate) async fn get(
 		JOIN courses AS c ON c.id = r.course_id
 		JOIN maps AS ma ON ma.id = c.map_id
 		JOIN modes AS mo ON mo.id = r.mode_id
-		JOIN players AS p ON p.id = r.player_id
+		JOIN players AS p ON p.id = r.player_id AND p.is_banned = 0
 		JOIN servers AS s ON s.id = r.server_id
 		ORDER BY r.id, r.created_on DESC
 		"#,

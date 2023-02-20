@@ -76,7 +76,7 @@ pub async fn get_servers(pool: &Pool<MySql>) -> Eyre<Vec<ServerRow>> {
 pub async fn get_map(map: MapIdentifier, pool: &Pool<MySql>) -> Eyre<MapRow> {
 	let filter = match map {
 		MapIdentifier::ID(map_id) => format!("id = {map_id}"),
-		MapIdentifier::Name(map_name) => todo!(r#"name LIKE "%{map_name}%""#),
+		MapIdentifier::Name(map_name) => format!(r#"name LIKE "%{map_name}%""#),
 	};
 
 	Ok(sqlx::query_as::<_, MapRow>(&format!(

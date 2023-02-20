@@ -61,8 +61,13 @@ async fn main() -> Eyre<()> {
 		.route("/api/maps/", get(routes::maps::index))
 		.route("/api/maps", get(routes::maps::index))
 		.route("/api/records/:id", get(routes::records::id))
-		.route("/api/records/recent/", get(routes::records::recent))
-		.route("/api/records/recent", get(routes::records::recent))
+		.route("/api/records/", get(routes::records::index))
+		.route("/api/records", get(routes::records::index))
+		.route("/api/records/top/map/:ident", get(routes::records::maptop))
+		.route(
+			"/api/records/top/player/:ident",
+			get(routes::records::player),
+		)
 		.with_state(global_state);
 
 	axum::Server::bind(&addr)
