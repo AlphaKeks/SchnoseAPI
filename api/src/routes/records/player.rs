@@ -28,6 +28,7 @@ pub(crate) struct Params {
 	has_teleports: Option<bool>,
 	created_after: Option<String>,
 	created_before: Option<String>,
+	pbs_only: Option<bool>,
 	limit: Option<u32>,
 }
 
@@ -92,7 +93,7 @@ pub(crate) async fn get(
 	let map_filter = if let Some(map) = params.map {
 		let map_ident = map.parse::<MapIdentifier>()?;
 		let map = get_map(map_ident, &pool).await?;
-		map.id.to_string()
+		format!("AND ma.id = {}", map.id)
 	} else {
 		String::new()
 	};
@@ -139,14 +140,15 @@ pub(crate) async fn get(
 		FROM (
 		  SELECT * FROM records
 		  {filter}
+		  {pb_filter}
 		  ORDER BY created_on DESC
 		) AS r
 		JOIN courses AS c ON c.id = r.course_id {stage_filter}
-		JOIN maps AS ma ON ma.id = c.map_id AND ma.id = {map_filter}
+		JOIN maps AS ma ON ma.id = c.map_id {map_filter}
 		JOIN modes AS mo ON mo.id = r.mode_id
 		JOIN players AS p ON p.id = r.player_id AND p.is_banned = 0 AND p.id = {player_id}
 		JOIN servers AS s ON s.id = r.server_id
-		ORDER BY r.time, r.created_on DESC
+		ORDER BY r.time
 		LIMIT {limit}
 		"#,
 	))
