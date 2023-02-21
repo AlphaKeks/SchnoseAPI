@@ -6,6 +6,7 @@ members = [
 	"crates/migrations",
 	"scripts/split_json_records",
 	"scripts/filter_json",
+	"scripts/fetch_maps",
 	"database",
 	"api",
 ]
