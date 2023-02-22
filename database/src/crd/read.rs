@@ -29,7 +29,7 @@ pub async fn get_player(player: PlayerIdentifier, pool: &Pool<MySql>) -> Eyre<Pl
 	debug!("Player: {player:?}");
 	let filter = match player {
 		PlayerIdentifier::Name(player_name) => {
-			format!(r#"name LIKE "%{player_name}%""#)
+			format!(r#"name LIKE "{player_name}%""#)
 		}
 		PlayerIdentifier::SteamID(steam_id) => {
 			let account_id =

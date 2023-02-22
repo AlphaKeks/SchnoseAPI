@@ -180,7 +180,7 @@ pub(crate) async fn get(
 			JOIN modes AS mode ON mode.id = r.mode_id
 			JOIN players AS p ON p.id = r.player_id AND r.player_id = {player_id}
 			JOIN servers AS s ON s.id = r.server_id
-			ORDER BY c.stage
+			ORDER BY c.stage ASC, r.created_on DESC
 			LIMIT {limit}
 		"#,
 	))
