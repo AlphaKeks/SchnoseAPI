@@ -51,6 +51,8 @@ async fn main() -> Eyre<()> {
 	 */
 	let router = Router::new()
 		.route("/", get(routes::index))
+		.route("/api/", get(routes::index))
+		.route("/api", get(routes::index))
 		.route("/api/modes/:ident", get(routes::modes::ident))
 		.route("/api/modes/", get(routes::modes::index))
 		.route("/api/modes", get(routes::modes::index))

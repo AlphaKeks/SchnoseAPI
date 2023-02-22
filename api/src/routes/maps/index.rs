@@ -17,7 +17,7 @@ use {
 pub(crate) struct Params {
 	name: Option<String>,
 	tier: Option<u8>,
-	courses: Option<u8>,
+	stages: Option<u8>,
 	validated: Option<bool>,
 	created_by: Option<String>,
 	approved_by: Option<String>,
@@ -81,7 +81,7 @@ pub(crate) async fn get(
 			.push_bind(tier as u8);
 	}
 
-	if let Some(courses) = params.courses {
+	if let Some(courses) = params.stages {
 		query
 			.push(if multiple_filters { " AND " } else { " WHERE " })
 			.push(" map.courses = ")
