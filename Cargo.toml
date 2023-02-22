@@ -7,6 +7,7 @@ members = [
 	"scripts/split_json_records",
 	"scripts/filter_json",
 	"scripts/fetch_maps",
+	"scripts/record_scraper",
 	"database",
 	"api",
 ]

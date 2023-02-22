@@ -1,6 +1,5 @@
 use {
 	super::maps::Course,
-	crate::util::number_to_bool,
 	database::schemas::FancyPlayer,
 	serde::{Deserialize, Serialize},
 	sqlx::{types::time::PrimitiveDateTime, FromRow},
@@ -12,22 +11,29 @@ pub(crate) use id::get as id;
 mod index;
 pub(crate) use index::get as index;
 
-mod maptop;
-pub(crate) use maptop::get as maptop;
+// mod maptop;
+// pub(crate) use maptop::get as maptop;
 
 // mod world_records;
 // pub(crate) use world_records::get as world_records;
 
-mod player;
-pub(crate) use player::get as player;
-
 #[derive(Debug, Clone, FromRow)]
 pub struct RecordQuery {
 	pub id: u32,
+	pub map_id: u16,
 	pub map_name: String,
-	pub course: String,
+	pub course_id: u32,
+	pub stage: u8,
+	pub kzt: bool,
+	pub kzt_difficulty: u8,
+	pub skz: bool,
+	pub skz_difficulty: u8,
+	pub vnl: bool,
+	pub vnl_difficulty: u8,
 	pub mode: String,
-	pub player: String,
+	pub player_id: u32,
+	pub player_name: String,
+	pub player_is_banned: bool,
 	pub server_name: String,
 	pub time: f64,
 	pub teleports: u32,
@@ -45,12 +51,4 @@ pub struct Record {
 	pub time: f64,
 	pub teleports: u32,
 	pub created_on: String,
-}
-
-#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
-pub struct PlayerRowJSON {
-	pub id: u32,
-	pub name: String,
-	#[serde(deserialize_with = "number_to_bool")]
-	pub is_banned: bool,
 }

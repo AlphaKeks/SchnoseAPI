@@ -136,10 +136,9 @@ async fn main() -> Eyre<()> {
 		 */
 		let mut sql_maps = String::from(
 			r#"
-			INSERT INTO maps
-			  (id, map_id, stage, kzt, kzt_difficulty, skz, skz_difficulty, vnl, vnl_difficulty)
-			VALUES
-			"#,
+INSERT INTO maps
+  (id, name, courses, validated, filesize, created_by, approved_by, created_on, updated_on)
+VALUES"#,
 		);
 
 		/*
@@ -159,10 +158,9 @@ async fn main() -> Eyre<()> {
 		 */
 		let mut sql_courses = String::from(
 			r#"
-			INSERT INTO courses
-			  (id, map_id, stage, kzt, kzt_difficulty, skz, skz_difficulty, vnl, vnl_difficulty)
-			VALUES
-			"#,
+INSERT INTO courses
+  (id, map_id, stage, kzt, kzt_difficulty, skz, skz_difficulty, vnl, vnl_difficulty)
+VALUES"#,
 		);
 
 		for (
@@ -181,17 +179,19 @@ async fn main() -> Eyre<()> {
 		{
 			sql_maps.push_str(&format!(
 				r#"
-			  ({i}, "{name}", 0, {validated}, {filesize}, 0, 0, "", ""),"#
+  ({i}, "{name}", 0, {validated}, {filesize}, 0, 0, "", ""),"#
 			));
 
 			sql_courses.push_str(&format!(
 				r#"
-			  (0, {i}, 0, {kzt}, {tier}, {skz}, {tier}, {vnl}, {tier}),"#
+  (0, {i}, 0, {kzt}, {tier}, {skz}, {tier}, {vnl}, {tier}),"#
 			));
 		}
 
-		_ = sql_maps.strip_suffix(',');
-		_ = sql_courses.strip_suffix(',');
+		let trailing_comma = sql_maps.rfind(',').unwrap();
+		sql_maps.replace_range(trailing_comma.., ";");
+		let trailing_comma = sql_courses.rfind(',').unwrap();
+		sql_courses.replace_range(trailing_comma.., ";\n");
 
 		let sql = format!("{sql_maps}\n{sql_courses}");
 

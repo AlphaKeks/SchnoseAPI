@@ -2,7 +2,7 @@
 
 ./node_modules/elasticdump/bin/elasticdump \
 	--input=$(cat ./credentials.txt) \
-	--output=./dump.json \
+	--output=$1 \
 	--type=data \
 	--limit=10000
 

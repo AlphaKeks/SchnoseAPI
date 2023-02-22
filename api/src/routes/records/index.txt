@@ -6,7 +6,7 @@ use {
 		Error, GlobalState,
 	},
 	axum::{
-		extract::{Path, Query, State},
+		extract::{Query, State},
 		Json,
 	},
 	chrono::NaiveDateTime,
@@ -23,27 +23,23 @@ use {
 #[derive(Debug, Deserialize)]
 pub(crate) struct Params {
 	mode: Option<String>,
-	stage: Option<u8>,
+	player: Option<String>,
 	map: Option<String>,
+	stage: Option<u8>,
 	has_teleports: Option<bool>,
+	pbs_only: Option<bool>,
 	created_after: Option<String>,
 	created_before: Option<String>,
-	pbs_only: Option<bool>,
 	limit: Option<u32>,
 }
 
 pub(crate) async fn get(
-	Path(player_ident): Path<String>,
 	Query(params): Query<Params>,
 	State(GlobalState { pool }): State<GlobalState>,
 ) -> Response<Vec<Record>> {
 	let start = Instant::now();
-	debug!("[records::player::get]");
-	debug!("> `player_ident`: {player_ident:#?}");
+	debug!("[records::get]");
 	debug!("> `params`: {params:#?}");
-
-	let player_ident = player_ident.parse::<PlayerIdentifier>()?;
-	debug!("> `player_ident`: {player_ident:#?}");
 
 	let mut filter = String::new();
 
@@ -52,9 +48,11 @@ pub(crate) async fn get(
 		filter.push_str(&format!("AND mode_id = {} ", mode as u8));
 	}
 
-	let stage_filter = params
-		.stage
-		.map_or(String::new(), |stage| format!("AND c.stage = {stage} "));
+	let pb_filter = if matches!(params.pbs_only, Some(true)) {
+		String::from("GROUP BY player_id")
+	} else {
+		String::new()
+	};
 
 	match (params.created_after, params.created_before) {
 		(Some(created_after), None) => {
@@ -86,21 +84,25 @@ pub(crate) async fn get(
 		_ => {}
 	};
 
-	let player_id = get_player(player_ident, &pool)
-		.await
-		.map(|player_row| player_row.id)?;
+	if let Some(player) = params.player {
+		let player_ident = player.parse::<PlayerIdentifier>()?;
+		let player = get_player(player_ident, &pool).await?;
+		filter.push_str(&format!("AND player_id = {} ", player.id));
+	}
 
-	let map_filter = if let Some(map) = params.map {
+	if let Some(map) = params.map {
 		let map_ident = map.parse::<MapIdentifier>()?;
 		let map = get_map(map_ident, &pool).await?;
-		format!("AND ma.id = {}", map.id)
-	} else {
-		String::new()
-	};
+		filter.push_str(&format!("AND c.map_id = {} ", map.id));
+	}
+
+	if let Some(stage) = params.stage {
+		filter.push_str(&format!("AND c.stage = {stage} "));
+	}
 
 	if let Some(has_teleports) = params.has_teleports {
 		filter.push_str(&format!(
-			"AND teleports {} 0 ",
+			"AND r.teleports {} 0 ",
 			if has_teleports { ">" } else { "=" }
 		));
 	}
@@ -109,7 +111,7 @@ pub(crate) async fn get(
 
 	let limit = params
 		.limit
-		.map_or(100, |limit| limit.min(250));
+		.map_or(10, |limit| limit.min(100));
 
 	let mut result = Vec::new();
 	for record_query in sqlx::query_as::<_, RecordQuery>(&format!(
@@ -142,14 +144,14 @@ pub(crate) async fn get(
 		  {filter}
 		  {pb_filter}
 		  ORDER BY created_on DESC
+		  LIMIT {limit}
 		) AS r
-		JOIN courses AS c ON c.id = r.course_id {stage_filter}
-		JOIN maps AS ma ON ma.id = c.map_id {map_filter}
+		JOIN courses AS c ON c.id = r.course_id
+		JOIN maps AS ma ON ma.id = c.map_id
 		JOIN modes AS mo ON mo.id = r.mode_id
-		JOIN players AS p ON p.id = r.player_id AND p.is_banned = 0 AND p.id = {player_id}
+		JOIN players AS p ON p.id = r.player_id AND p.is_banned = 0
 		JOIN servers AS s ON s.id = r.server_id
-		ORDER BY r.time
-		LIMIT {limit}
+		ORDER BY r.id, r.created_on DESC
 		"#,
 	))
 	.fetch_all(&pool)

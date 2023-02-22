@@ -1,9 +1,9 @@
 use {
-	super::{PlayerRowJSON, Record, RecordQuery},
+	super::{Record, RecordQuery},
 	crate::{
 		models::{Response, ResponseBody},
 		routes::maps::Course,
-		Error, GlobalState,
+		GlobalState,
 	},
 	axum::{
 		extract::{Path, State},
@@ -27,23 +27,20 @@ pub(crate) async fn get(
 		r#"
 		SELECT
 		  r.id AS id,
-		  ma.name AS map_name,
-		  JSON_OBJECT(
-		    "id", c.id,
-		    "stage", c.stage,
-		    "kzt", c.kzt,
-		    "kzt_difficulty", c.kzt_difficulty,
-		    "skz", c.skz,
-		    "skz_difficulty", c.skz_difficulty,
-		    "vnl", c.vnl,
-		    "vnl_difficulty", c.vnl_difficulty
-		  ) AS course,
-		  mo.name AS mode,
-		  JSON_OBJECT(
-		    "id", p.id,
-		    "name", p.name,
-		    "is_banned", p.is_banned
-		  ) AS player,
+		  map.id AS map_id,
+		  map.name AS map_name,
+		  c.id AS course_id,
+		  c.stage AS stage,
+		  c.kzt AS kzt,
+		  c.kzt_difficulty AS kzt_difficulty,
+		  c.skz AS skz,
+		  c.skz_difficulty AS skz_difficulty,
+		  c.vnl AS vnl,
+		  c.vnl_difficulty AS vnl_difficulty,
+		  mode.name AS mode,
+		  p.id AS player_id,
+		  p.name AS player_name,
+		  p.is_banned AS player_is_name,
 		  s.name AS server_name,
 		  r.time AS time,
 		  r.teleports AS teleports,
@@ -60,28 +57,30 @@ pub(crate) async fn get(
 	.fetch_one(&pool)
 	.await?;
 
-	let course = serde_json::from_str::<Course>(&record_query.course).map_err(|_| Error::JSON)?;
-	let player = {
-		let player =
-			serde_json::from_str::<PlayerRowJSON>(&record_query.player).map_err(|_| Error::JSON)?;
-
-		let steam_id64 = account_id_to_steam_id64(player.id);
-		let steam_id = SteamID::from(steam_id64);
-		FancyPlayer {
-			id: player.id,
-			name: player.name,
-			steam_id: steam_id.to_string(),
-			steam_id64: steam_id64.to_string(),
-			is_banned: player.is_banned,
-		}
-	};
+	let steam_id64 = account_id_to_steam_id64(record_query.player_id);
+	let steam_id = SteamID::from(steam_id64);
 
 	let result = Record {
 		id: record_query.id,
 		map_name: record_query.map_name,
-		course,
+		course: Course {
+			id: record_query.course_id,
+			stage: record_query.stage,
+			kzt: record_query.kzt,
+			kzt_difficulty: record_query.kzt_difficulty,
+			skz: record_query.skz,
+			skz_difficulty: record_query.skz_difficulty,
+			vnl: record_query.vnl,
+			vnl_difficulty: record_query.vnl_difficulty,
+		},
 		mode: record_query.mode,
-		player,
+		player: FancyPlayer {
+			id: record_query.player_id,
+			name: record_query.player_name,
+			steam_id: steam_id.to_string(),
+			steam_id64: steam_id64.to_string(),
+			is_banned: record_query.player_is_banned,
+		},
 		server_name: record_query.server_name,
 		time: record_query.time,
 		teleports: record_query.teleports,

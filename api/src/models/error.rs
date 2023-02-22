@@ -5,7 +5,8 @@ use {
 		Json,
 	},
 	chrono::ParseError,
-	log::{error, warn},
+	// log::error,
+	log::warn,
 	serde::{Deserialize, Serialize},
 	std::fmt::Display,
 };
@@ -52,29 +53,32 @@ impl IntoResponse for Error {
 impl From<sqlx::Error> for Error {
 	fn from(value: sqlx::Error) -> Self {
 		warn!("SQL Error: {value:?}");
-		match value {
-			sqlx::Error::Database(db_err) => Self::Database {
-				message: String::from((*db_err).message()),
-			},
-			sqlx::Error::RowNotFound => Self::Database {
-				message: String::from("No entries found."),
-			},
-			sqlx::Error::ColumnDecode { index, source } => {
-				error!("Failed to decode column.");
-				error!("{index:?}");
-				error!("{source:?}");
-				Self::Database {
-					message: String::from("Failed to decode database column."),
-				}
-			}
-			sqlx::Error::Decode(db_err) => {
-				error!("Failed to decode value.");
-				error!("{db_err:?}");
-				Self::Database {
-					message: String::from("Failed to decode database value."),
-				}
-			}
-			_ => Self::Unknown,
+		// match value {
+		// 	sqlx::Error::Database(db_err) => Self::Database {
+		// 		message: String::from((*db_err).message()),
+		// 	},
+		// 	sqlx::Error::RowNotFound => Self::Database {
+		// 		message: String::from("No entries found."),
+		// 	},
+		// 	sqlx::Error::ColumnDecode { index, source } => {
+		// 		error!("Failed to decode column.");
+		// 		error!("{index:?}");
+		// 		error!("{source:?}");
+		// 		Self::Database {
+		// 			message: String::from("Failed to decode database column."),
+		// 		}
+		// 	}
+		// 	sqlx::Error::Decode(db_err) => {
+		// 		error!("Failed to decode value.");
+		// 		error!("{db_err:?}");
+		// 		Self::Database {
+		// 			message: String::from("Failed to decode database value."),
+		// 		}
+		// 	}
+		// 	_ => Self::Unknown,
+		// }
+		Self::Database {
+			message: String::from("Database error."),
 		}
 	}
 }

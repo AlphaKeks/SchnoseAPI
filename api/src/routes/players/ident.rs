@@ -44,13 +44,13 @@ pub struct Player {
 #[derive(Debug, Serialize)]
 pub struct RecordSummary {
 	total: u32,
-	kzt: RecordReport,
-	skz: RecordReport,
-	vnl: RecordReport,
+	kzt: RecordCount,
+	skz: RecordCount,
+	vnl: RecordCount,
 }
 
 #[derive(Debug, Serialize)]
-pub struct RecordReport {
+pub struct RecordCount {
 	tp: u32,
 	pro: u32,
 }
@@ -102,15 +102,15 @@ pub(crate) async fn get(
 			is_banned: db_player.is_banned,
 			records: RecordSummary {
 				total: db_player.total as u32,
-				kzt: RecordReport {
+				kzt: RecordCount {
 					tp: db_player.kzt_tp.try_into().unwrap(),
 					pro: db_player.kzt_pro.try_into().unwrap(),
 				},
-				skz: RecordReport {
+				skz: RecordCount {
 					tp: db_player.skz_tp.try_into().unwrap(),
 					pro: db_player.skz_pro.try_into().unwrap(),
 				},
-				vnl: RecordReport {
+				vnl: RecordCount {
 					tp: db_player.vnl_tp.try_into().unwrap(),
 					pro: db_player.vnl_pro.try_into().unwrap(),
 				},

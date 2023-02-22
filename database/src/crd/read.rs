@@ -2,10 +2,12 @@ use {
 	crate::schemas::*,
 	color_eyre::{eyre::eyre, Result as Eyre},
 	gokz_rs::prelude::*,
+	log::debug,
 	sqlx::{MySql, Pool},
 };
 
 pub async fn get_mode(mode: Mode, pool: &Pool<MySql>) -> Eyre<ModeRow> {
+	debug!("Mode: {mode:?}");
 	Ok(sqlx::query_as::<_, ModeRow>(&format!(
 		r#"
 		SELECT * FROM modes
@@ -24,6 +26,7 @@ pub async fn get_modes(pool: &Pool<MySql>) -> Eyre<Vec<ModeRow>> {
 }
 
 pub async fn get_player(player: PlayerIdentifier, pool: &Pool<MySql>) -> Eyre<PlayerRow> {
+	debug!("Player: {player:?}");
 	let filter = match player {
 		PlayerIdentifier::Name(player_name) => {
 			format!(r#"name LIKE "%{player_name}%""#)
@@ -50,6 +53,7 @@ pub async fn get_player(player: PlayerIdentifier, pool: &Pool<MySql>) -> Eyre<Pl
 }
 
 pub async fn get_server(server: String, pool: &Pool<MySql>) -> Eyre<ServerRow> {
+	debug!("Server: {server:?}");
 	let filter = if let Ok(server_id) = server.parse::<u16>() {
 		format!("id = {server_id}")
 	} else {
@@ -74,6 +78,7 @@ pub async fn get_servers(pool: &Pool<MySql>) -> Eyre<Vec<ServerRow>> {
 }
 
 pub async fn get_map(map: MapIdentifier, pool: &Pool<MySql>) -> Eyre<MapRow> {
+	debug!("Map: {map:?}");
 	let filter = match map {
 		MapIdentifier::ID(map_id) => format!("id = {map_id}"),
 		MapIdentifier::Name(map_name) => format!(r#"name LIKE "%{map_name}%""#),
@@ -97,6 +102,7 @@ pub async fn get_maps(pool: &Pool<MySql>) -> Eyre<Vec<MapRow>> {
 }
 
 pub async fn get_course(course_id: u16, pool: &Pool<MySql>) -> Eyre<CourseRow> {
+	debug!("Course: {course_id:?}");
 	Ok(sqlx::query_as::<_, CourseRow>(&format!(
 		r#"
 		SELECT * FROM courses
@@ -119,6 +125,7 @@ pub async fn get_courses(map_id: u16, pool: &Pool<MySql>) -> Eyre<Vec<CourseRow>
 }
 
 pub async fn get_record(record_id: u32, pool: &Pool<MySql>) -> Eyre<RecordRow> {
+	debug!("Record: {record_id:?}");
 	Ok(sqlx::query_as::<_, RecordRow>(&format!(
 		r#"
 		SELECT * FROM records
