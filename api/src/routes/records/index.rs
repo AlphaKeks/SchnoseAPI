@@ -64,9 +64,7 @@ pub(crate) async fn get(
 		"#,
 	);
 
-	let limit = params
-		.limit
-		.map_or(100, |limit| limit.min(250));
+	let limit = params.limit.unwrap_or(100);
 
 	let no_params = params.mode.is_none()
 		&& params.stage.is_none()
@@ -189,6 +187,8 @@ pub(crate) async fn get(
 
 		query
 			.push(" ORDER BY r_inner.created_on DESC")
+			.push(" LIMIT ")
+			.push_bind(limit)
 			.push(") AS r ");
 	}
 
