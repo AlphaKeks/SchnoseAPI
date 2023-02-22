@@ -1,3 +1,5 @@
+use sqlx::{types::Decimal, FromRow, QueryBuilder};
+
 use {
 	crate::{GlobalState, Response, ResponseBody},
 	axum::{
@@ -10,6 +12,20 @@ use {
 	serde::Serialize,
 	std::time::Instant,
 };
+
+#[derive(Debug, FromRow)]
+struct DBPlayer {
+	id: u32,
+	name: String,
+	is_banned: bool,
+	total: i64,
+	kzt_tp: Decimal,
+	kzt_pro: Decimal,
+	skz_tp: Decimal,
+	skz_pro: Decimal,
+	vnl_tp: Decimal,
+	vnl_pro: Decimal,
+}
 
 #[derive(Debug, Serialize)]
 pub struct Player {
@@ -47,55 +63,59 @@ pub(crate) async fn get(
 
 	let player = get_player(player_ident, &pool).await?;
 
-	let result = sqlx::query!(
+	let mut query = QueryBuilder::new(
 		r#"
 		SELECT
-		  p.id                                     AS `id!`,
-		  p.name                                   AS `name!`,
-		  p.is_banned                              AS `is_banned!: bool`,
-		  COUNT(*)                                 AS `total!: u32`,
-		  SUM(r.mode_id = 200 AND r.teleports > 0) AS `kzt_tp!: u32`,
-		  SUM(r.mode_id = 200 AND r.teleports = 0) AS `kzt_pro!: u32`,
-		  SUM(r.mode_id = 201 AND r.teleports > 0) AS `skz_tp!: u32`,
-		  SUM(r.mode_id = 201 AND r.teleports = 0) AS `skz_pro!: u32`,
-		  SUM(r.mode_id = 202 AND r.teleports > 0) AS `vnl_tp!: u32`,
-		  SUM(r.mode_id = 202 AND r.teleports = 0) AS `vnl_pro!: u32`
+		  p.id                                     AS id,
+		  p.name                                   AS name,
+		  p.is_banned                              AS is_banned,
+		  COUNT(*)                                 AS total,
+		  SUM(r.mode_id = 200 AND r.teleports > 0) AS kzt_tp,
+		  SUM(r.mode_id = 200 AND r.teleports = 0) AS kzt_pro,
+		  SUM(r.mode_id = 201 AND r.teleports > 0) AS skz_tp,
+		  SUM(r.mode_id = 201 AND r.teleports = 0) AS skz_pro,
+		  SUM(r.mode_id = 202 AND r.teleports > 0) AS vnl_tp,
+		  SUM(r.mode_id = 202 AND r.teleports = 0) AS vnl_pro
 		FROM players AS p
 		JOIN records AS r ON r.player_id = p.id
-		WHERE p.id = ?
-		GROUP BY p.id
-		LIMIT 1
+		WHERE p.id =
 		"#,
-		player.id
-	)
-	.fetch_one(&pool)
-	.await
-	.map(|db_player| {
-		let steam_id64 = account_id_to_steam_id64(db_player.id);
-		let steam_id = SteamID::from(steam_id64);
-		Player {
-			id: db_player.id,
-			name: db_player.name,
-			steam_id: steam_id.to_string(),
-			steam_id64: steam_id64.to_string(),
-			is_banned: db_player.is_banned,
-			records: RecordSummary {
-				total: db_player.total,
-				kzt: RecordCount {
-					tp: db_player.kzt_tp,
-					pro: db_player.kzt_pro,
+	);
+
+	query
+		.push_bind(player.id)
+		.push(" LIMIT 1 ");
+
+	let result = query
+		.build_query_as::<DBPlayer>()
+		.fetch_one(&pool)
+		.await
+		.map(|db_player| {
+			let steam_id64 = account_id_to_steam_id64(db_player.id);
+			let steam_id = SteamID::from(steam_id64);
+			Player {
+				id: db_player.id,
+				name: db_player.name,
+				steam_id: steam_id.to_string(),
+				steam_id64: steam_id64.to_string(),
+				is_banned: db_player.is_banned,
+				records: RecordSummary {
+					total: db_player.total as u32,
+					kzt: RecordCount {
+						tp: db_player.kzt_tp.try_into().unwrap(),
+						pro: db_player.kzt_pro.try_into().unwrap(),
+					},
+					skz: RecordCount {
+						tp: db_player.skz_tp.try_into().unwrap(),
+						pro: db_player.skz_pro.try_into().unwrap(),
+					},
+					vnl: RecordCount {
+						tp: db_player.vnl_tp.try_into().unwrap(),
+						pro: db_player.vnl_pro.try_into().unwrap(),
+					},
 				},
-				skz: RecordCount {
-					tp: db_player.skz_tp,
-					pro: db_player.skz_pro,
-				},
-				vnl: RecordCount {
-					tp: db_player.vnl_tp,
-					pro: db_player.vnl_pro,
-				},
-			},
-		}
-	})?;
+			}
+		})?;
 
 	debug!("> {result:#?}");
 
