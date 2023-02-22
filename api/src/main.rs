@@ -47,6 +47,10 @@ async fn main() -> Eyre<()> {
 
 	let global_state = GlobalState { pool };
 
+	/* TODO:
+	 * `/records/top/world_records`
+	 * `/records/place/:record_id`
+	 */
 	let router = Router::new()
 		.route("/", get(routes::index))
 		.route("/api/modes/:ident", get(routes::modes::ident))

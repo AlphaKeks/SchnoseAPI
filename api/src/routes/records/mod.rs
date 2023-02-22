@@ -17,6 +17,11 @@ pub(crate) use player::get as player;
 mod map;
 pub(crate) use map::get as map;
 
+#[allow(unused)]
+mod world_records;
+#[allow(unused)]
+pub(crate) use world_records::get as world_records;
+
 #[derive(Debug, Clone, FromRow)]
 pub struct RecordQuery {
 	pub id: u32,
