@@ -162,6 +162,7 @@ pub async fn insert_records(records: &[RecordData], pool: &Pool<MySql>) -> Eyre<
 	let query = |(
 	id, course_id, mode_id, player_id, server_id, time, teleports, created_on
 	): &RecordData| {
+		let created_on = created_on.format("%Y-%m-%d %H:%M:%S");
 		format!(
 			r#"
 			INSERT INTO records
