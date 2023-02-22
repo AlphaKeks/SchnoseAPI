@@ -7,6 +7,7 @@ use {
 	database::schemas::PlayerRow,
 	log::debug,
 	serde::Deserialize,
+	sqlx::QueryBuilder,
 	std::time::Instant,
 };
 
@@ -25,27 +26,33 @@ pub(crate) async fn get(
 	debug!("[players::get]");
 	debug!("> `params`: {params:#?}");
 
-	let mut filter = None;
-	if let Some(is_banned) = params.is_banned {
-		filter = Some(format!("WHERE p.is_banned = {}", is_banned as u8));
-	}
-
-	let result = sqlx::query_as::<_, PlayerRow>(&format!(
+	let mut query = QueryBuilder::new(
 		r#"
 		SELECT * FROM players AS p
-		{}
-		ORDER BY p.id DESC
-		LIMIT {}
-		OFFSET {}
 		"#,
-		filter.unwrap_or_default(),
-		params
-			.limit
-			.map_or(100, |limit| limit.min(500)),
-		params.offset.unwrap_or(0)
-	))
-	.fetch_all(&pool)
-	.await?;
+	);
+
+	if let Some(is_banned) = params.is_banned {
+		query
+			.push("WHERE p.is_banned = ")
+			.push_bind(is_banned);
+	}
+
+	query
+		.push(" ORDER BY p.id DESC ")
+		.push(" LIMIT ")
+		.push_bind(
+			params
+				.limit
+				.map_or(100, |limit| limit.min(500)),
+		)
+		.push(" OFFSET ")
+		.push_bind(params.offset.unwrap_or(0));
+
+	let result = query
+		.build_query_as::<PlayerRow>()
+		.fetch_all(&pool)
+		.await?;
 
 	debug!("> {result:#?}");
 

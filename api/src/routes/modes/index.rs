@@ -2,7 +2,6 @@ use {
 	super::Mode,
 	crate::{GlobalState, Response, ResponseBody},
 	axum::{extract::State, Json},
-	database::schemas::ModeRow,
 	gokz_rs::prelude::Mode as GOKZMode,
 	log::debug,
 	std::time::Instant,
@@ -12,7 +11,7 @@ pub(crate) async fn get(State(GlobalState { pool }): State<GlobalState>) -> Resp
 	let start = Instant::now();
 	debug!("[modes::index::get]");
 
-	let result = sqlx::query_as::<_, ModeRow>("SELECT * FROM modes")
+	let result = sqlx::query!("SELECT * FROM modes")
 		.fetch_all(&pool)
 		.await?
 		.into_iter()

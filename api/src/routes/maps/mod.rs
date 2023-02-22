@@ -1,6 +1,5 @@
 use {
-	crate::util::number_to_bool,
-	serde::{Deserialize, Serialize},
+	serde::{de::Error, Deserialize, Deserializer, Serialize},
 	sqlx::{types::time::PrimitiveDateTime, FromRow},
 };
 
@@ -11,47 +10,61 @@ mod ident;
 pub(crate) use ident::get as ident;
 
 #[derive(Debug, Clone, FromRow)]
-pub struct MapRow {
-	pub id: u16,
-	pub name: String,
-	pub courses: String,
-	pub validated: bool,
-	pub filesize: u64,
-	pub mapper_name: String,
-	pub created_by: u32,
-	pub approver_name: String,
-	pub approved_by: u32,
-	pub created_on: PrimitiveDateTime,
-	pub updated_on: PrimitiveDateTime,
+pub(crate) struct MapRow {
+	pub(crate) id: u16,
+	pub(crate) name: String,
+	pub(crate) courses: String,
+	pub(crate) validated: bool,
+	pub(crate) filesize: u64,
+	pub(crate) mapper_name: String,
+	pub(crate) created_by: u32,
+	pub(crate) approver_name: String,
+	pub(crate) approved_by: u32,
+	pub(crate) created_on: PrimitiveDateTime,
+	pub(crate) updated_on: PrimitiveDateTime,
 }
 
 #[derive(Debug, Clone, Copy, FromRow, Serialize, Deserialize)]
 pub struct Course {
-	pub id: u32,
-	pub stage: u8,
+	pub(crate) id: u32,
+	pub(crate) stage: u8,
 	#[serde(deserialize_with = "number_to_bool")]
-	pub kzt: bool,
-	pub kzt_difficulty: u8,
+	pub(crate) kzt: bool,
+	pub(crate) kzt_difficulty: u8,
 	#[serde(deserialize_with = "number_to_bool")]
-	pub skz: bool,
-	pub skz_difficulty: u8,
+	pub(crate) skz: bool,
+	pub(crate) skz_difficulty: u8,
 	#[serde(deserialize_with = "number_to_bool")]
-	pub vnl: bool,
-	pub vnl_difficulty: u8,
+	pub(crate) vnl: bool,
+	pub(crate) vnl_difficulty: u8,
 }
 
 #[derive(Debug, Serialize)]
-pub struct Map {
-	pub id: u16,
-	pub name: String,
-	pub tier: u8,
-	pub courses: Vec<Course>,
-	pub validated: bool,
-	pub mapper_name: String,
-	pub mapper_steam_id64: String,
-	pub approver_name: String,
-	pub approver_steam_id64: String,
-	pub filesize: String,
-	pub created_on: String,
-	pub updated_on: String,
+pub(crate) struct Map {
+	pub(crate) id: u16,
+	pub(crate) name: String,
+	pub(crate) tier: u8,
+	pub(crate) courses: Vec<Course>,
+	pub(crate) validated: bool,
+	pub(crate) mapper_name: String,
+	pub(crate) mapper_steam_id64: String,
+	pub(crate) approver_name: String,
+	pub(crate) approver_steam_id64: String,
+	pub(crate) filesize: String,
+	pub(crate) created_on: String,
+	pub(crate) updated_on: String,
+}
+
+pub fn number_to_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	let num = i32::deserialize(deserializer)?;
+	if num == 1 {
+		Ok(true)
+	} else if num == 0 {
+		Ok(false)
+	} else {
+		Err(Error::custom(crate::Error::JSON))
+	}
 }

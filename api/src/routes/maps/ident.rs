@@ -8,6 +8,7 @@ use {
 	database::schemas::account_id_to_steam_id64,
 	gokz_rs::prelude::*,
 	log::debug,
+	sqlx::QueryBuilder,
 	std::time::Instant,
 };
 
@@ -32,12 +33,7 @@ pub(crate) async fn get(
 		}
 	}
 
-	let filter = match map_ident {
-		MapIdentifier::ID(map_id) => format!("map.id = {map_id}"),
-		MapIdentifier::Name(map_name) => format!(r#"map.name LIKE "%{map_name}%""#),
-	};
-
-	let map_row = sqlx::query_as::<_, MapRow>(&format!(
+	let mut query = QueryBuilder::new(
 		r#"
 		SELECT
 		  map.id,
@@ -62,16 +58,40 @@ pub(crate) async fn get(
 		  map.approved_by,
 		  map.created_on,
 		  map.updated_on
-		FROM maps AS map
-		JOIN courses AS c ON c.map_id = map.id
+		FROM (
+		  SELECT * FROM maps AS map
+		  WHERE
+		"#,
+	);
+
+	match map_ident {
+		MapIdentifier::ID(map_id) => {
+			query
+				.push("map.id = ")
+				.push_bind(map_id)
+				.push(" LIMIT 1) AS map");
+		}
+		MapIdentifier::Name(map_name) => {
+			query
+				.push("map.name LIKE ")
+				.push_bind(format!("%{map_name}%"))
+				.push(" LIMIT 1) AS map");
+		}
+	};
+
+	query.push(
+		r#"
+		JOIN `courses` AS c ON c.map_id = map.id
 		JOIN players AS mapper ON mapper.id = map.created_by
 		JOIN players AS approver ON approver.id = map.approved_by
-		WHERE {filter}
 		LIMIT 1
-		"#
-	))
-	.fetch_one(&pool)
-	.await?;
+		"#,
+	);
+
+	let map_row = query
+		.build_query_as::<MapRow>()
+		.fetch_one(&pool)
+		.await?;
 
 	let courses = serde_json::from_str::<Vec<Course>>(&map_row.courses).map_err(|_| Error::JSON)?;
 
@@ -81,10 +101,10 @@ pub(crate) async fn get(
 		tier: courses[0].kzt_difficulty,
 		courses,
 		validated: map_row.validated,
-		mapper_steam_id64: account_id_to_steam_id64(map_row.created_by).to_string(),
 		mapper_name: map_row.mapper_name,
-		approver_steam_id64: account_id_to_steam_id64(map_row.approved_by).to_string(),
+		mapper_steam_id64: account_id_to_steam_id64(map_row.created_by).to_string(),
 		approver_name: map_row.approver_name,
+		approver_steam_id64: account_id_to_steam_id64(map_row.approved_by).to_string(),
 		filesize: map_row.filesize.to_string(),
 		created_on: map_row.created_on.to_string(),
 		updated_on: map_row.updated_on.to_string(),

@@ -13,6 +13,7 @@ use {
 	gokz_rs::prelude::*,
 	log::debug,
 	serde::Deserialize,
+	sqlx::QueryBuilder,
 	std::time::Instant,
 };
 
@@ -36,199 +37,175 @@ pub(crate) async fn get(
 	debug!("[records::player::get]");
 	debug!("> `params`: {params:#?}");
 
-	let mut inner_query = String::from("SELECT r_inner.* FROM records AS r_inner");
-
-	// If there are no parameters specified, we can `LIMIT` the query earlier, resulting in _much_
-	// faster results.
-	let mut limit_early = true;
-
-	if let Some(mode) = params.mode {
-		let mode_id = mode.parse::<Mode>()? as u8;
-		inner_query.push_str(&format!(
-			"\n  JOIN modes AS mode ON mode.id = r_inner.mode_id AND mode.id = {mode_id}"
-		));
-		limit_early = false;
-	}
-
-	match (params.stage, params.map) {
-		(Some(stage), None) => {
-			inner_query.push_str(&format!(
-				"\n  JOIN courses AS c ON c.id = r_inner.course_id AND c.stage = {stage}"
-			));
-			limit_early = false;
-		}
-		(None, Some(map_ident)) => {
-			let map_ident = map_ident.parse::<MapIdentifier>()?;
-			let map_id = get_map(map_ident, &pool)
-				.await
-				.map(|map| map.id)?;
-			inner_query.push_str(&format!(
-				"\n  JOIN courses AS c ON c.id = r_inner.course_id AND c.map_id = {map_id}"
-			));
-			limit_early = false;
-		}
-		(Some(stage), Some(map_ident)) => {
-			let map_ident = map_ident.parse::<MapIdentifier>()?;
-			let map_id = get_map(map_ident, &pool)
-				.await
-				.map(|map| map.id)?;
-			inner_query.push_str(&format!(
-				"\n  JOIN courses AS c ON c.id = r_inner.course_id AND c.stage = {stage} AND c.map_id = {map_id}"
-			));
-			limit_early = false;
-		}
-		(None, None) => {}
-	};
-
-	if let Some(player_ident) = params.player {
-		let player_ident = player_ident.parse::<PlayerIdentifier>()?;
-		let player_id = get_player(player_ident, &pool)
-			.await
-			.map(|player_row| player_row.id)?;
-
-		inner_query.push_str(&format!(
-			"\n  JOIN players AS p ON p.id = r_inner.player_id AND p.id = {player_id}"
-		));
-		limit_early = false;
-	}
-
-	let mut inner_filter = String::new();
-
-	match (params.created_after, params.created_before) {
-		(Some(created_after), None) => {
-			let created_after = NaiveDateTime::parse_from_str(&created_after, "%Y-%m-%dT%H:%M:%S")?
-				.format("%Y-%m-%d %H:%M:%S");
-
-			inner_filter.push_str(&format!(
-				r#"
-				  AND r_inner.created_on > "{created_after}"
-				"#
-			));
-			limit_early = false;
-		}
-		(None, Some(created_before)) => {
-			let created_before =
-				NaiveDateTime::parse_from_str(&created_before, "%Y-%m-%dT%H:%M:%S")?
-					.format("%Y-%m-%d %H:%M:%S");
-
-			inner_filter.push_str(&format!(
-				r#"
-				  AND r_inner.created_on < "{created_before}"
-				"#
-			));
-			limit_early = false;
-		}
-		(Some(created_after), Some(created_before)) => {
-			let created_after = NaiveDateTime::parse_from_str(&created_after, "%Y-%m-%dT%H:%M:%S")?;
-			let created_before =
-				NaiveDateTime::parse_from_str(&created_before, "%Y-%m-%dT%H:%M:%S")?;
-
-			if created_after.timestamp() > created_before.timestamp() {
-				return Err(Error::DateRange);
-			}
-
-			inner_filter.push_str(&format!(
-				r#"
-				  AND r_inner.created_on > "{}"
-				  AND r_inner.created_on < "{}"
-				"#,
-				created_after.format("%Y-%m-%d %H:%M:%S"),
-				created_before.format("%Y-%m-%d %H:%M:%S"),
-			));
-			limit_early = false;
-		}
-		_ => {}
-	};
-
-	if let Some(has_teleports) = params.has_teleports {
-		inner_filter.push_str(&format!(
-			"\n  AND r_inner.teleports {} 0",
-			if has_teleports { ">" } else { "=" }
-		));
-		limit_early = false;
-	}
+	let mut query = QueryBuilder::new(
+		r#"
+		SELECT
+		  r.id AS id,
+		  map.id AS map_id,
+		  map.name AS map_name,
+		  c.id AS course_id,
+		  c.stage AS stage,
+		  c.kzt AS kzt,
+		  c.kzt_difficulty AS kzt_difficulty,
+		  c.skz AS skz,
+		  c.skz_difficulty AS skz_difficulty,
+		  c.vnl AS vnl,
+		  c.vnl_difficulty AS vnl_difficulty,
+		  mode.name AS mode,
+		  p.id AS player_id,
+		  p.name AS player_name,
+		  p.is_banned AS player_is_banned,
+		  s.name AS server_name,
+		  r.time AS time,
+		  r.teleports AS teleports,
+		  r.created_on AS created_on
+		FROM (
+		  SELECT r_inner.* FROM records AS r_inner
+		"#,
+	);
 
 	let limit = params
 		.limit
 		.map_or(100, |limit| limit.min(250));
 
-	inner_query.push_str(&inner_filter.replacen("AND", "WHERE", 1));
+	let no_params = params.mode.is_none()
+		&& params.stage.is_none()
+		&& params.map.is_none()
+		&& params.player.is_none()
+		&& params.has_teleports.is_none()
+		&& params.created_after.is_none()
+		&& params.created_before.is_none()
+		&& params.limit.is_none();
 
-	let query = if limit_early {
-		format!(
-			r#"
-			SELECT
-			  r.id AS id,
-			  map.id AS map_id,
-			  map.name AS map_name,
-			  c.id AS course_id,
-			  c.stage AS stage,
-			  c.kzt AS kzt,
-			  c.kzt_difficulty AS kzt_difficulty,
-			  c.skz AS skz,
-			  c.skz_difficulty AS skz_difficulty,
-			  c.vnl AS vnl,
-			  c.vnl_difficulty AS vnl_difficulty,
-			  mode.name AS mode,
-			  p.id AS player_id,
-			  p.name AS player_name,
-			  p.is_banned AS player_is_banned,
-			  s.name AS server_name,
-			  r.time AS time,
-			  r.teleports AS teleports,
-			  r.created_on AS created_on
-			FROM (
-			  SELECT * FROM records AS r_inner
-			  ORDER BY r_inner.created_on DESC
-			  LIMIT {limit}
-			) AS r
-			JOIN courses AS c ON c.id = r.course_id
-			JOIN maps AS map ON map.id = c.map_id
-			JOIN modes AS mode ON mode.id = r.mode_id
-			JOIN players AS p ON p.id = r.player_id
-			JOIN servers AS s ON s.id = r.server_id
-			ORDER BY r.created_on DESC
-			"#,
-		)
+	if no_params {
+		query
+			.push(" ORDER BY r_inner.created_on DESC")
+			.push(" LIMIT ")
+			.push_bind(limit)
+			.push(") AS r ");
 	} else {
-		format!(
-			r#"
-			SELECT
-			  r.id AS id,
-			  map.id AS map_id,
-			  map.name AS map_name,
-			  c.id AS course_id,
-			  c.stage AS stage,
-			  c.kzt AS kzt,
-			  c.kzt_difficulty AS kzt_difficulty,
-			  c.skz AS skz,
-			  c.skz_difficulty AS skz_difficulty,
-			  c.vnl AS vnl,
-			  c.vnl_difficulty AS vnl_difficulty,
-			  mode.name AS mode,
-			  p.id AS player_id,
-			  p.name AS player_name,
-			  p.is_banned AS player_is_banned,
-			  s.name AS server_name,
-			  r.time AS time,
-			  r.teleports AS teleports,
-			  r.created_on AS created_on
-			FROM (
-			  {inner_query}
-			) AS r
-			JOIN courses AS c ON c.id = r.course_id
-			JOIN maps AS map ON map.id = c.map_id
-			JOIN modes AS mode ON mode.id = r.mode_id
-			JOIN players AS p ON p.id = r.player_id
-			JOIN servers AS s ON s.id = r.server_id
-			ORDER BY r.created_on DESC
-			LIMIT {limit}
-			"#,
-		)
-	};
+		if let Some(mode) = params.mode {
+			let mode_id = mode.parse::<Mode>()? as u8;
+			query
+				.push(" JOIN modes AS mode ON mode.id = r_inner.mode_id AND mode.id = ")
+				.push_bind(mode_id);
+		}
+
+		match (params.stage, params.map) {
+			(Some(stage), None) => {
+				query
+					.push(" JOIN courses AS c ON c.id = r_inner.course_id AND c.stage = ")
+					.push_bind(stage);
+			}
+			(None, Some(map_ident)) => {
+				let map_ident = map_ident.parse::<MapIdentifier>()?;
+				let map_id = get_map(map_ident, &pool)
+					.await
+					.map(|map| map.id)?;
+
+				query
+					.push(" JOIN courses AS c ON c.id = r_inner.course_id AND c.map_id = ")
+					.push_bind(map_id);
+			}
+			(Some(stage), Some(map_ident)) => {
+				let map_ident = map_ident.parse::<MapIdentifier>()?;
+				let map_id = get_map(map_ident, &pool)
+					.await
+					.map(|map| map.id)?;
+
+				query
+					.push(" JOIN courses AS c ON c.id = r_inner.course_id AND c.stage = ")
+					.push_bind(stage)
+					.push(" AND c.map_id = ")
+					.push_bind(map_id);
+			}
+			(None, None) => {}
+		};
+
+		if let Some(player_ident) = params.player {
+			let player_ident = player_ident.parse::<PlayerIdentifier>()?;
+			let player_id = get_player(player_ident, &pool)
+				.await
+				.map(|player_row| player_row.id)?;
+
+			query
+				.push(" JOIN players AS p ON p.id = r_inner.player_id AND p.id = ")
+				.push_bind(player_id);
+		}
+
+		let mut multiple_filters = false;
+
+		match (params.created_after, params.created_before) {
+			(Some(created_after), None) => {
+				let created_after =
+					NaiveDateTime::parse_from_str(&created_after, "%Y-%m-%dT%H:%M:%S")?
+						.format("%Y-%m-%d %H:%M:%S")
+						.to_string();
+
+				query
+					.push(" WHERE r_inner.created_on > ")
+					.push_bind(created_after);
+
+				multiple_filters = true;
+			}
+			(None, Some(created_before)) => {
+				let created_before =
+					NaiveDateTime::parse_from_str(&created_before, "%Y-%m-%dT%H:%M:%S")?
+						.format("%Y-%m-%d %H:%M:%S")
+						.to_string();
+
+				query
+					.push(" WHERE r_inner.created_on < ")
+					.push_bind(created_before);
+
+				multiple_filters = true;
+			}
+			(Some(created_after), Some(created_before)) => {
+				let created_after =
+					NaiveDateTime::parse_from_str(&created_after, "%Y-%m-%dT%H:%M:%S")?;
+				let created_before =
+					NaiveDateTime::parse_from_str(&created_before, "%Y-%m-%dT%H:%M:%S")?;
+
+				if created_after.timestamp() > created_before.timestamp() {
+					return Err(Error::DateRange);
+				}
+
+				query
+					.push(" WHERE r_inner.created_on > ")
+					.push_bind(created_after.to_string())
+					.push(" AND r_inner.created_on < ")
+					.push_bind(created_before.to_string());
+
+				multiple_filters = true;
+			}
+			_ => {}
+		};
+
+		if let Some(has_teleports) = params.has_teleports {
+			query
+				.push(if multiple_filters { " AND " } else { " WHERE " })
+				.push(format!(" r_inner.teleports {} 0", if has_teleports { ">" } else { "=" }));
+		}
+
+		query
+			.push(" ORDER BY r_inner.created_on DESC")
+			.push(") AS r ");
+	}
+
+	query.push(
+		r#"
+		JOIN courses AS c ON c.id = r.course_id
+		JOIN maps AS map ON map.id = c.map_id
+		JOIN modes AS mode ON mode.id = r.mode_id
+		JOIN players AS p ON p.id = r.player_id
+		JOIN servers AS s ON s.id = r.server_id
+		ORDER BY r.created_on DESC
+		"#,
+	);
 
 	let mut result = Vec::new();
-	for record_query in sqlx::query_as::<_, RecordQuery>(&query)
+	for record_query in query
+		.build_query_as::<RecordQuery>()
 		.fetch_all(&pool)
 		.await?
 	{

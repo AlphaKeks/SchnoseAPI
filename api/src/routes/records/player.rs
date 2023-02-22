@@ -1,5 +1,3 @@
-use database::schemas::{steam_id64_to_account_id, steam_id_to_account_id};
-
 use {
 	super::{Record, RecordQuery},
 	crate::{routes::maps::Course, Error, GlobalState, Response, ResponseBody},
@@ -15,6 +13,7 @@ use {
 	gokz_rs::prelude::*,
 	log::debug,
 	serde::Deserialize,
+	sqlx::QueryBuilder,
 	std::time::Instant,
 };
 
@@ -41,114 +40,11 @@ pub(crate) async fn get(
 	debug!("> `player_ident`: {player_ident:#?}");
 	debug!("> `params`: {params:#?}");
 
-	let player_id = match player_ident {
-		ident @ PlayerIdentifier::Name(_) => get_player(ident, &pool)
-			.await
-			.map(|player_row| player_row.id)?,
-		PlayerIdentifier::SteamID(steam_id) => steam_id_to_account_id(&steam_id.to_string())
-			.ok_or(Error::Input {
-				message: format!("Interpreted `{steam_id}` as a SteamID but it was invalid."),
-				expected: String::from("a valid SteamID"),
-			})?,
-		PlayerIdentifier::SteamID64(steam_id64) => steam_id64_to_account_id(steam_id64)?,
-	};
+	let player_id = get_player(player_ident, &pool)
+		.await
+		.map(|player_row| player_row.id)?;
 
-	let mut inner_query = String::new();
-
-	if let Some(mode) = params.mode {
-		let mode_id = mode.parse::<Mode>()? as u8;
-		inner_query.push_str(&format!(
-			"\n  JOIN modes AS mode ON mode.id = r_inner.mode_id AND mode.id = {mode_id}"
-		));
-	}
-
-	match (params.stage, params.map) {
-		(Some(stage), None) => {
-			inner_query.push_str(&format!(
-				"\n  JOIN courses AS c ON c.id = r_inner.course_id AND c.stage = {stage}"
-			));
-		}
-		(None, Some(map_ident)) => {
-			let map_ident = map_ident.parse::<MapIdentifier>()?;
-			let map_id = get_map(map_ident, &pool)
-				.await
-				.map(|map| map.id)?;
-			inner_query.push_str(&format!(
-				"\n  JOIN courses AS c ON c.id = r_inner.course_id AND c.map_id = {map_id}"
-			));
-		}
-		(Some(stage), Some(map_ident)) => {
-			let map_ident = map_ident.parse::<MapIdentifier>()?;
-			let map_id = get_map(map_ident, &pool)
-				.await
-				.map(|map| map.id)?;
-			inner_query.push_str(&format!(
-				"\n  JOIN courses AS c ON c.id = r_inner.course_id AND c.stage = {stage} AND c.map_id = {map_id}"
-			));
-		}
-		(None, None) => {}
-	};
-
-	let mut inner_filter = String::new();
-
-	match (params.created_after, params.created_before) {
-		(Some(created_after), None) => {
-			let created_after = NaiveDateTime::parse_from_str(&created_after, "%Y-%m-%dT%H:%M:%S")?
-				.format("%Y-%m-%d %H:%M:%S");
-
-			inner_filter.push_str(&format!(
-				r#"
-				  AND r_inner.created_on > "{created_after}"
-				"#
-			));
-		}
-		(None, Some(created_before)) => {
-			let created_before =
-				NaiveDateTime::parse_from_str(&created_before, "%Y-%m-%dT%H:%M:%S")?
-					.format("%Y-%m-%d %H:%M:%S");
-
-			inner_filter.push_str(&format!(
-				r#"
-				  AND r_inner.created_on < "{created_before}"
-				"#
-			));
-		}
-		(Some(created_after), Some(created_before)) => {
-			let created_after = NaiveDateTime::parse_from_str(&created_after, "%Y-%m-%dT%H:%M:%S")?;
-			let created_before =
-				NaiveDateTime::parse_from_str(&created_before, "%Y-%m-%dT%H:%M:%S")?;
-
-			if created_after.timestamp() > created_before.timestamp() {
-				return Err(Error::DateRange);
-			}
-
-			inner_filter.push_str(&format!(
-				r#"
-				  AND r_inner.created_on > "{}"
-				  AND r_inner.created_on < "{}"
-				"#,
-				created_after.format("%Y-%m-%d %H:%M:%S"),
-				created_before.format("%Y-%m-%d %H:%M:%S"),
-			));
-		}
-		_ => {}
-	};
-
-	if let Some(has_teleports) = params.has_teleports {
-		inner_filter.push_str(&format!(
-			"\n  AND r_inner.teleports {} 0",
-			if has_teleports { ">" } else { "=" }
-		));
-	}
-
-	let limit = params
-		.limit
-		.map_or(100, |limit| limit.min(250));
-
-	debug!("FILTER: {inner_filter}");
-
-	let mut result = Vec::new();
-	for record_query in sqlx::query_as::<_, RecordQuery>(&format!(
+	let mut query = QueryBuilder::new(
 		r#"
 			SELECT
 			  r.id AS id,
@@ -171,25 +67,125 @@ pub(crate) async fn get(
 			  r.teleports AS teleports,
 			  r.created_on AS created_on
 			FROM (
-			  SELECT r_inner.course_id, MIN(r_inner.time) AS time
+			  SELECT
+			    r_inner.course_id,
+			    MIN(r_inner.time) AS time
 			  FROM records AS r_inner
-			  JOIN players AS p ON p.id = r_inner.player_id AND r_inner.player_id = {player_id}
-			  {inner_query}
-			  {inner_filter}
-			  GROUP BY r_inner.course_id
+			  JOIN players AS p ON p.id = r_inner.player_id AND r_inner.player_id =
+		"#,
+	);
+
+	query.push_bind(player_id);
+
+	if let Some(stage) = params.stage {
+		query
+			.push(" AND c.stage = ")
+			.push_bind(stage);
+	}
+
+	if let Some(mode) = params.mode {
+		let mode_id = mode.parse::<Mode>()? as u8;
+		query
+			.push(" JOIN modes AS mode ON mode.id = r_inner.mode_id AND mode.id = ")
+			.push_bind(mode_id);
+	}
+
+	if let Some(map_ident) = params.map {
+		let map_ident = map_ident.parse::<MapIdentifier>()?;
+		let map_id = if let MapIdentifier::ID(map_id) = map_ident {
+			map_id as u16
+		} else {
+			get_map(map_ident, &pool)
+				.await
+				.map(|map_row| map_row.id)?
+		};
+
+		query
+			.push(" JOIN maps AS m ON m.id = ")
+			.push_bind(map_id);
+	}
+
+	let mut multiple_filters = false;
+
+	match (params.created_after, params.created_before) {
+		(Some(created_after), None) => {
+			let created_after = NaiveDateTime::parse_from_str(&created_after, "%Y-%m-%dT%H:%M:%S")?
+				.format("%Y-%m-%d %H:%M:%S")
+				.to_string();
+
+			query
+				.push(" WHERE r_inner.created_on > ")
+				.push_bind(created_after);
+
+			multiple_filters = true;
+		}
+		(None, Some(created_before)) => {
+			let created_before =
+				NaiveDateTime::parse_from_str(&created_before, "%Y-%m-%dT%H:%M:%S")?
+					.format("%Y-%m-%d %H:%M:%S")
+					.to_string();
+
+			query
+				.push(" WHERE r_inner.created_on < ")
+				.push_bind(created_before);
+
+			multiple_filters = true;
+		}
+		(Some(created_after), Some(created_before)) => {
+			let created_after = NaiveDateTime::parse_from_str(&created_after, "%Y-%m-%dT%H:%M:%S")?;
+			let created_before =
+				NaiveDateTime::parse_from_str(&created_before, "%Y-%m-%dT%H:%M:%S")?;
+
+			if created_after.timestamp() > created_before.timestamp() {
+				return Err(Error::DateRange);
+			}
+
+			query
+				.push(" WHERE r_inner.created_on > ")
+				.push_bind(created_after.to_string())
+				.push(" AND r_inner.created_on < ")
+				.push_bind(created_before.to_string());
+
+			multiple_filters = true;
+		}
+		_ => {}
+	};
+
+	if let Some(has_teleports) = params.has_teleports {
+		query
+			.push(if multiple_filters { " AND " } else { " WHERE " })
+			.push(format!(" r_inner.teleports {} 0", if has_teleports { ">" } else { "=" }));
+	}
+
+	query
+		.push(
+			r#"
+		    GROUP BY r_inner.course_id
 			) AS pb
-			JOIN records AS r ON r.course_id = pb.course_id AND r.time = pb.time
+			JOIN records AS r
+			  ON r.course_id = pb.course_id
+			  AND r.time = pb.time
 			JOIN courses AS c ON c.id = r.course_id
 			JOIN maps AS map ON map.id = c.map_id
 			JOIN modes AS mode ON mode.id = r.mode_id
-			JOIN players AS p ON p.id = r.player_id AND r.player_id = {player_id}
+			JOIN players AS p ON p.id = r.player_id AND r.player_id = 
+			"#,
+		)
+		.push_bind(player_id)
+		.push(
+			r#"
 			JOIN servers AS s ON s.id = r.server_id
-			ORDER BY c.stage ASC, r.created_on DESC
-			LIMIT {limit}
-		"#,
-	))
-	.fetch_all(&pool)
-	.await?
+			ORDER BY r.created_on DESC, c.stage ASC
+			LIMIT
+			"#,
+		)
+		.push_bind(params.limit.unwrap_or(100));
+
+	let mut result = Vec::new();
+	for record_query in query
+		.build_query_as::<RecordQuery>()
+		.fetch_all(&pool)
+		.await?
 	{
 		let steam_id64 = account_id_to_steam_id64(record_query.player_id);
 		let steam_id = SteamID::from(steam_id64);

@@ -1,5 +1,5 @@
 use {
-	super::{Record, RecordQuery},
+	super::Record,
 	crate::{routes::maps::Course, GlobalState, Response, ResponseBody},
 	axum::{
 		extract::{Path, State},
@@ -19,7 +19,7 @@ pub(crate) async fn get(
 	debug!("[records::id::get]");
 	debug!("> `record_id`: {record_id:#?}");
 
-	let record_query = sqlx::query_as::<_, RecordQuery>(&format!(
+	let record_query = sqlx::query!(
 		r#"
 		SELECT
 		  r.id AS id,
@@ -27,29 +27,30 @@ pub(crate) async fn get(
 		  map.name AS map_name,
 		  c.id AS course_id,
 		  c.stage AS stage,
-		  c.kzt AS kzt,
+		  c.kzt AS `kzt: bool`,
 		  c.kzt_difficulty AS kzt_difficulty,
-		  c.skz AS skz,
+		  c.skz AS `skz: bool`,
 		  c.skz_difficulty AS skz_difficulty,
-		  c.vnl AS vnl,
+		  c.vnl AS `vnl: bool`,
 		  c.vnl_difficulty AS vnl_difficulty,
 		  mode.name AS mode,
 		  p.id AS player_id,
 		  p.name AS player_name,
-		  p.is_banned AS player_is_name,
+		  p.is_banned AS `player_is_banned: bool`,
 		  s.name AS server_name,
 		  r.time AS time,
 		  r.teleports AS teleports,
 		  r.created_on AS created_on
 		FROM records AS r
 		JOIN courses AS c ON c.id = r.course_id
-		JOIN maps AS ma ON ma.id = c.map_id
-		JOIN modes AS mo ON mo.id = r.mode_id
+		JOIN maps AS map ON map.id = c.map_id
+		JOIN modes AS mode ON mode.id = r.mode_id
 		JOIN players AS p ON p.id = r.player_id
 		JOIN servers AS s ON s.id = r.server_id
-		WHERE r.id = {record_id}
-		"#
-	))
+		WHERE r.id = ?
+		"#,
+		record_id
+	)
 	.fetch_one(&pool)
 	.await?;
 

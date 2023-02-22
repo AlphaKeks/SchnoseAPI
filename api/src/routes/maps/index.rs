@@ -9,6 +9,7 @@ use {
 	gokz_rs::prelude::*,
 	log::debug,
 	serde::Deserialize,
+	sqlx::QueryBuilder,
 	std::time::Instant,
 };
 
@@ -31,48 +32,11 @@ pub(crate) async fn get(
 	debug!("[maps::get]");
 	debug!("> `params`: {params:#?}");
 
-	let mut filter = String::new();
-
-	if let Some(map_name) = params.name {
-		filter.push_str(&format!(r#"AND m.name LIKE "%{map_name}%""#));
-	}
-
-	if let Some(tier) = params.tier {
-		let tier = Tier::try_from(tier)?;
-		filter.push_str(&format!("AND m.tier = {} ", tier as u8));
-	}
-
-	if let Some(courses) = params.courses {
-		filter.push_str(&format!("AND m.courses = {courses} "));
-	}
-
-	if let Some(validated) = params.validated {
-		filter.push_str(&format!("AND m.validated = {validated} "));
-	}
-
-	if let Some(created_by) = params.created_by {
-		let ident = PlayerIdentifier::try_from(created_by)?;
-		let player = get_player(ident, &pool).await?;
-		filter.push_str(&format!("AND m.created_by = {} ", player.id));
-	}
-
-	if let Some(approved_by) = params.approved_by {
-		let ident = PlayerIdentifier::try_from(approved_by)?;
-		let player = get_player(ident, &pool).await?;
-		filter.push_str(&format!("AND m.approved_by = {} ", player.id));
-	}
-
-	filter = filter.replacen("AND", "WHERE", 1);
-
-	let limit = params
-		.limit
-		.map_or(1500, |limit| limit.min(1500));
-
-	let result = sqlx::query_as::<_, MapRow>(&format!(
+	let mut query = QueryBuilder::new(
 		r#"
 		SELECT
-		  m.id AS id,
-		  m.name AS name,
+		  map.id,
+		  map.name,
 		  c.kzt_difficulty AS tier,
 		  JSON_ARRAYAGG(
 		    JSON_OBJECT(
@@ -86,45 +50,110 @@ pub(crate) async fn get(
 		      "vnl_difficulty", c.vnl_difficulty
 		    )
 		  ) AS courses,
-		  m.validated AS validated,
+		  map.validated,
 		  mapper.name AS mapper_name,
-		  m.created_by,
+		  map.created_by,
 		  approver.name AS approver_name,
-		  m.approved_by,
-		  m.filesize AS filesize,
-		  m.created_on AS created_on,
-		  m.updated_on AS updated_on
-		FROM maps AS m
-		JOIN courses AS c ON c.map_id = m.id
-		JOIN players AS mapper ON mapper.id = m.created_by
-		JOIN players AS approver ON approver.id = m.approved_by
-		{filter}
-		GROUP BY m.id
-		ORDER BY m.created_on
-		LIMIT {limit}
-		"#
-	))
-	.fetch_all(&pool)
-	.await?
-	.into_iter()
-	.filter_map(|map_row| {
-		let courses = serde_json::from_str::<Vec<Course>>(&map_row.courses).ok()?;
-		Some(Map {
-			id: map_row.id,
-			name: map_row.name,
-			tier: courses[0].kzt_difficulty,
-			courses,
-			validated: map_row.validated,
-			mapper_name: map_row.mapper_name,
-			mapper_steam_id64: account_id_to_steam_id64(map_row.created_by).to_string(),
-			approver_name: map_row.approver_name,
-			approver_steam_id64: account_id_to_steam_id64(map_row.approved_by).to_string(),
-			filesize: map_row.filesize.to_string(),
-			created_on: map_row.created_on.to_string(),
-			updated_on: map_row.updated_on.to_string(),
+		  map.approved_by,
+		  map.filesize,
+		  map.created_on,
+		  map.updated_on
+		FROM (
+		  SELECT * FROM maps AS map
+		"#,
+	);
+
+	let mut multiple_filters = false;
+
+	if let Some(map_name) = params.name {
+		query
+			.push(" WHERE ")
+			.push(" map.name LIKE ")
+			.push_bind(format!("%{map_name}%"));
+		multiple_filters = true;
+	}
+
+	if let Some(tier) = params.tier {
+		let tier = Tier::try_from(tier)?;
+		query
+			.push(if multiple_filters { " AND " } else { " WHERE " })
+			.push(" map.tier = ")
+			.push_bind(tier as u8);
+	}
+
+	if let Some(courses) = params.courses {
+		query
+			.push(if multiple_filters { " AND " } else { " WHERE " })
+			.push(" map.courses = ")
+			.push_bind(courses);
+	}
+
+	if let Some(validated) = params.validated {
+		query
+			.push(if multiple_filters { " AND " } else { " WHERE " })
+			.push(" map.validated = ")
+			.push_bind(validated);
+	}
+
+	if let Some(created_by) = params.created_by {
+		let ident = PlayerIdentifier::try_from(created_by)?;
+		let player = get_player(ident, &pool).await?;
+		query
+			.push(if multiple_filters { " AND " } else { " WHERE " })
+			.push(" map.created_by = ")
+			.push_bind(player.id);
+	}
+
+	if let Some(approved_by) = params.approved_by {
+		let ident = PlayerIdentifier::try_from(approved_by)?;
+		let player = get_player(ident, &pool).await?;
+		query
+			.push(if multiple_filters { " AND " } else { " WHERE " })
+			.push(" map.created_by = ")
+			.push_bind(player.id);
+	}
+
+	query
+		.push(" LIMIT ")
+		.push_bind(
+			params
+				.limit
+				.map_or(1500, |limit| limit.min(1500)),
+		)
+		.push(") AS map")
+		.push(
+			r#"
+			JOIN courses AS c ON c.map_id = map.id
+			JOIN players AS mapper ON mapper.id = map.created_by
+			JOIN players AS approver ON approver.id = map.approved_by
+			GROUP BY map.id
+			ORDER BY map.created_on
+			"#,
+		);
+
+	let result = query
+		.build_query_as::<MapRow>()
+		.fetch_all(&pool)
+		.await?
+		.into_iter()
+		.filter_map(|map_row| {
+			let courses = serde_json::from_str::<Vec<Course>>(&map_row.courses).ok()?;
+			Some(Map {
+				id: map_row.id,
+				name: map_row.name,
+				tier: courses[0].kzt_difficulty,
+				courses,
+				validated: map_row.validated,
+				mapper_name: map_row.mapper_name,
+				mapper_steam_id64: account_id_to_steam_id64(map_row.created_by).to_string(),
+				approver_name: map_row.approver_name,
+				approver_steam_id64: account_id_to_steam_id64(map_row.approved_by).to_string(),
+				filesize: map_row.filesize.to_string(),
+				created_on: map_row.created_on.to_string(),
+				updated_on: map_row.updated_on.to_string(),
+			})
 		})
-	})
-	.collect();
+		.collect();
 
 	Ok(Json(ResponseBody {
 		result,

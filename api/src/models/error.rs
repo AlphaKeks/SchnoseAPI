@@ -8,6 +8,7 @@ use {
 	// log::error,
 	log::warn,
 	serde::{Deserialize, Serialize},
+	sqlx::Error as SQLError,
 	std::fmt::Display,
 };
 
@@ -15,6 +16,7 @@ use {
 #[allow(clippy::upper_case_acronyms)]
 pub(crate) enum Error {
 	Unknown,
+	Infallible,
 	Custom { message: String },
 	Database { message: String },
 	GOKZ { message: String },
@@ -28,6 +30,7 @@ impl Display for Error {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.write_str(&match self {
 			Error::Unknown => String::from("Unknown error occurred."),
+			Error::Infallible => String::from("Encountered error which should not have happened."),
 			Error::Custom { message } | Error::Database { message } | Error::GOKZ { message } => {
 				message.to_owned()
 			}
@@ -41,10 +44,10 @@ impl Display for Error {
 
 impl IntoResponse for Error {
 	fn into_response(self) -> Response {
-		if let Error::Input { .. } = self {
-			(StatusCode::BAD_REQUEST, Json(self.to_string()))
-		} else {
-			(StatusCode::INTERNAL_SERVER_ERROR, Json(self.to_string()))
+		match self {
+			Error::Input { .. } => (StatusCode::BAD_REQUEST, Json(self.to_string())),
+			Error::Database { message } => (StatusCode::NOT_FOUND, Json(message)),
+			_ => (StatusCode::INTERNAL_SERVER_ERROR, Json(self.to_string())),
 		}
 		.into_response()
 	}
@@ -53,32 +56,14 @@ impl IntoResponse for Error {
 impl From<sqlx::Error> for Error {
 	fn from(value: sqlx::Error) -> Self {
 		warn!("SQL Error: {value:?}");
-		// match value {
-		// 	sqlx::Error::Database(db_err) => Self::Database {
-		// 		message: String::from((*db_err).message()),
-		// 	},
-		// 	sqlx::Error::RowNotFound => Self::Database {
-		// 		message: String::from("No entries found."),
-		// 	},
-		// 	sqlx::Error::ColumnDecode { index, source } => {
-		// 		error!("Failed to decode column.");
-		// 		error!("{index:?}");
-		// 		error!("{source:?}");
-		// 		Self::Database {
-		// 			message: String::from("Failed to decode database column."),
-		// 		}
-		// 	}
-		// 	sqlx::Error::Decode(db_err) => {
-		// 		error!("Failed to decode value.");
-		// 		error!("{db_err:?}");
-		// 		Self::Database {
-		// 			message: String::from("Failed to decode database value."),
-		// 		}
-		// 	}
-		// 	_ => Self::Unknown,
-		// }
-		Self::Database {
-			message: String::from("Database error."),
+		if let SQLError::RowNotFound = value {
+			Self::Database {
+				message: String::from("No entries found."),
+			}
+		} else {
+			Self::Database {
+				message: String::from("Database error."),
+			}
 		}
 	}
 }
@@ -92,7 +77,7 @@ impl From<gokz_rs::prelude::Error> for Error {
 
 impl From<std::convert::Infallible> for Error {
 	fn from(_: std::convert::Infallible) -> Self {
-		Self::Unknown
+		Self::Infallible
 	}
 }
 

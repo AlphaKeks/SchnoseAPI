@@ -9,11 +9,9 @@ use {
 };
 
 mod models;
-pub(crate) use models::error::Error;
-pub(crate) use models::{Response, ResponseBody};
+pub(crate) use models::{error::Error, Response, ResponseBody};
 
 mod routes;
-mod util;
 
 #[tokio::main]
 async fn main() -> Eyre<()> {
@@ -39,8 +37,8 @@ async fn main() -> Eyre<()> {
 	info!("Listening on {addr}.");
 
 	let pool = MySqlPoolOptions::new()
-		.min_connections(10)
-		.max_connections(50)
+		.min_connections(30)
+		.max_connections(100)
 		.connect(&config.mysql_url)
 		.await?;
 	debug!("Connected to database.");
@@ -68,10 +66,7 @@ async fn main() -> Eyre<()> {
 		.route("/api/records/:id", get(routes::records::id))
 		.route("/api/records/", get(routes::records::index))
 		.route("/api/records", get(routes::records::index))
-		.route(
-			"/api/records/top/player/:ident",
-			get(routes::records::player),
-		)
+		.route("/api/records/top/player/:ident", get(routes::records::player))
 		.route("/api/records/top/map/:ident", get(routes::records::map))
 		.with_state(global_state);
 

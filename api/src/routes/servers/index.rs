@@ -12,6 +12,7 @@ use {
 	gokz_rs::prelude::*,
 	log::debug,
 	serde::Deserialize,
+	sqlx::QueryBuilder,
 	std::time::Instant,
 };
 
@@ -31,56 +32,7 @@ pub(crate) async fn get(
 	debug!("[servers::get]");
 	debug!("> `params`: {params:#?}");
 
-	let mut filter = String::new();
-	if let Some(name) = params.name {
-		filter.push_str(&format!(r#"AND s.name LIKE "%{name}%""#));
-	}
-
-	if let Some(owned_by) = params.owned_by {
-		let ident = PlayerIdentifier::try_from(owned_by)?;
-		filter.push_str(&format!(
-			"AND o.{} ",
-			match ident {
-				PlayerIdentifier::Name(name) => {
-					format!(r#"name LIKE "%{name}%" "#)
-				}
-				PlayerIdentifier::SteamID(steam_id) => {
-					let account_id = steam_id_to_account_id(&steam_id.to_string())
-						.ok_or(eyre!("Invalid SteamID"))?;
-					format!(r#"id = {account_id} "#)
-				}
-				PlayerIdentifier::SteamID64(steam_id64) => {
-					let account_id = steam_id64_to_account_id(steam_id64)?;
-					format!(r#"id = {account_id} "#)
-				}
-			}
-		));
-	}
-
-	if let Some(approved_by) = params.approved_by {
-		let ident = PlayerIdentifier::try_from(approved_by)?;
-		filter.push_str(&format!(
-			"AND a.{} ",
-			match ident {
-				PlayerIdentifier::Name(name) => {
-					format!(r#"name LIKE "%{name}%" "#)
-				}
-				PlayerIdentifier::SteamID(steam_id) => {
-					let account_id = steam_id_to_account_id(&steam_id.to_string())
-						.ok_or(eyre!("Invalid SteamID"))?;
-					format!(r#"id = {account_id} "#)
-				}
-				PlayerIdentifier::SteamID64(steam_id64) => {
-					let account_id = steam_id64_to_account_id(steam_id64)?;
-					format!(r#"id = {account_id} "#)
-				}
-			}
-		));
-	}
-
-	filter = filter.replacen("AND", "WHERE", 1);
-
-	let result = sqlx::query_as::<_, ServerQuery>(&format!(
+	let mut query = QueryBuilder::new(
 		r#"
 		SELECT
 		  s.id        AS id,
@@ -94,42 +46,108 @@ pub(crate) async fn get(
 		FROM servers AS s
 		JOIN players AS o ON o.id = s.owned_by
 		JOIN players AS a ON a.id = s.approved_by
-		{filter}
-		LIMIT {}
 		"#,
+	);
+
+	let mut multiple_filers = false;
+
+	if let Some(name) = params.name {
+		query
+			.push(" WHERE s.name LIKE ")
+			.push_bind(format!("%{name}%"));
+		multiple_filers = true;
+	}
+
+	if let Some(owned_by) = params.owned_by {
+		let ident = PlayerIdentifier::try_from(owned_by)?;
+
+		query.push(if multiple_filers { " AND " } else { " WHERE " });
+		match ident {
+			PlayerIdentifier::Name(name) => {
+				query
+					.push(" o.name LIKE ")
+					.push_bind(format!("%{name}%"));
+			}
+			PlayerIdentifier::SteamID(steam_id) => {
+				let account_id = steam_id_to_account_id(&steam_id.to_string())
+					.ok_or(eyre!("Invalid SteamID"))?;
+				query
+					.push(" o.id = ")
+					.push_bind(account_id);
+			}
+			PlayerIdentifier::SteamID64(steam_id64) => {
+				let account_id = steam_id64_to_account_id(steam_id64)?;
+				query
+					.push(" o.id = ")
+					.push_bind(account_id);
+			}
+		};
+		multiple_filers = true;
+	}
+
+	if let Some(approved_by) = params.approved_by {
+		let ident = PlayerIdentifier::try_from(approved_by)?;
+
+		query.push(if multiple_filers { " AND " } else { " WHERE " });
+		match ident {
+			PlayerIdentifier::Name(name) => {
+				query
+					.push(" a.name LIKE ")
+					.push_bind(format!("%{name}%"));
+			}
+			PlayerIdentifier::SteamID(steam_id) => {
+				let account_id = steam_id_to_account_id(&steam_id.to_string())
+					.ok_or(eyre!("Invalid SteamID"))?;
+				query
+					.push(" a.id = ")
+					.push_bind(account_id);
+			}
+			PlayerIdentifier::SteamID64(steam_id64) => {
+				let account_id = steam_id64_to_account_id(steam_id64)?;
+				query
+					.push(" a.id = ")
+					.push_bind(account_id);
+			}
+		};
+	}
+
+	query.push(" LIMIT ").push_bind(
 		params
 			.limit
-			.map_or(1500, |limit| limit.min(1500))
-	))
-	.fetch_all(&pool)
-	.await?
-	.into_iter()
-	.map(|server_query| {
-		let owner_steam_id64 = account_id_to_steam_id64(server_query.owner_id);
-		let owner_steam_id = SteamID::from(owner_steam_id64);
-		let approver_steam_id64 = account_id_to_steam_id64(server_query.approver_id);
-		let approver_steam_id = SteamID::from(approver_steam_id64);
+			.map_or(1500, |limit| limit.min(1500)),
+	);
 
-		Server {
-			id: server_query.id,
-			name: server_query.name,
-			owned_by: FancyPlayer {
-				id: server_query.owner_id,
-				name: server_query.owner_name,
-				steam_id: owner_steam_id.to_string(),
-				steam_id64: owner_steam_id64.to_string(),
-				is_banned: server_query.owner_is_banned,
-			},
-			approved_by: FancyPlayer {
-				id: server_query.approver_id,
-				name: server_query.approver_name,
-				steam_id: approver_steam_id.to_string(),
-				steam_id64: approver_steam_id64.to_string(),
-				is_banned: server_query.approver_is_banned,
-			},
-		}
-	})
-	.collect();
+	let result = query
+		.build_query_as::<ServerQuery>()
+		.fetch_all(&pool)
+		.await?
+		.into_iter()
+		.map(|server_query| {
+			let owner_steam_id64 = account_id_to_steam_id64(server_query.owner_id);
+			let owner_steam_id = SteamID::from(owner_steam_id64);
+			let approver_steam_id64 = account_id_to_steam_id64(server_query.approver_id);
+			let approver_steam_id = SteamID::from(approver_steam_id64);
+
+			Server {
+				id: server_query.id,
+				name: server_query.name,
+				owned_by: FancyPlayer {
+					id: server_query.owner_id,
+					name: server_query.owner_name,
+					steam_id: owner_steam_id.to_string(),
+					steam_id64: owner_steam_id64.to_string(),
+					is_banned: server_query.owner_is_banned,
+				},
+				approved_by: FancyPlayer {
+					id: server_query.approver_id,
+					name: server_query.approver_name,
+					steam_id: approver_steam_id.to_string(),
+					steam_id64: approver_steam_id64.to_string(),
+					is_banned: server_query.approver_is_banned,
+				},
+			}
+		})
+		.collect();
 
 	Ok(Json(ResponseBody {
 		result,
