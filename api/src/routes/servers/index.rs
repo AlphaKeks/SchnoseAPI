@@ -1,9 +1,6 @@
 use {
 	super::{Server, ServerQuery},
-	crate::{
-		models::{Response, ResponseBody},
-		GlobalState,
-	},
+	crate::{GlobalState, Response, ResponseBody},
 	axum::{
 		extract::{Query, State},
 		Json,

@@ -1,15 +1,10 @@
-use database::crd::read::get_player;
-
 use {
-	crate::{
-		models::{Response, ResponseBody},
-		GlobalState,
-	},
+	crate::{GlobalState, Response, ResponseBody},
 	axum::{
 		extract::{Path, State},
 		Json,
 	},
-	database::schemas::account_id_to_steam_id64,
+	database::{crd::read::get_player, schemas::account_id_to_steam_id64},
 	gokz_rs::prelude::*,
 	log::debug,
 	serde::Serialize,

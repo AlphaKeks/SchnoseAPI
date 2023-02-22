@@ -10,6 +10,7 @@ use {
 
 mod models;
 pub(crate) use models::error::Error;
+pub(crate) use models::{Response, ResponseBody};
 
 mod routes;
 mod util;
@@ -19,7 +20,7 @@ async fn main() -> Eyre<()> {
 	color_eyre::install()?;
 	let args = Args::parse();
 
-	let config_file = std::fs::read_to_string(args.config_file)?;
+	let config_file = std::fs::read_to_string(args.config_path)?;
 	let config: Config = toml::from_str(&config_file)?;
 
 	std::env::set_var(
@@ -84,15 +85,15 @@ struct Args {
 	/// Print debug information.
 	debug: bool,
 
-	#[arg(long)]
+	#[arg(long = "log")]
 	#[clap(default_value = "INFO")]
-	/// `RUST_LOG`
+	/// `RUST_LOG` level.
 	log_level: String,
 
-	#[arg(long)]
+	#[arg(long = "config")]
 	#[clap(default_value = "./config.toml")]
-	/// Config file
-	config_file: PathBuf,
+	/// Path to the config file containing the IP, port, log level and some secrets.
+	config_path: PathBuf,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

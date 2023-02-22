@@ -1,10 +1,6 @@
 use {
 	super::{Record, RecordQuery},
-	crate::{
-		models::{Response, ResponseBody},
-		routes::maps::Course,
-		Error, GlobalState,
-	},
+	crate::{routes::maps::Course, Error, GlobalState, Response, ResponseBody},
 	axum::{
 		extract::{Path, Query, State},
 		Json,

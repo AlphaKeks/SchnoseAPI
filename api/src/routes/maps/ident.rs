@@ -1,9 +1,6 @@
 use {
 	super::{Course, Map, MapRow},
-	crate::{
-		models::{Response, ResponseBody},
-		Error, GlobalState,
-	},
+	crate::{Error, GlobalState, Response, ResponseBody},
 	axum::{
 		extract::{Path, State},
 		Json,

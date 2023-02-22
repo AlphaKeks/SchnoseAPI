@@ -1,9 +1,6 @@
 use {
 	super::Mode,
-	crate::{
-		models::{Response, ResponseBody},
-		GlobalState,
-	},
+	crate::{GlobalState, Response, ResponseBody},
 	axum::{extract::State, Json},
 	database::schemas::ModeRow,
 	gokz_rs::prelude::Mode as GOKZMode,
