@@ -18,13 +18,19 @@ pub(crate) async fn get(
 	let start = Instant::now();
 	debug!("[maps::ident::get]");
 	debug!("> `map_ident`: {map_ident:#?}");
-
-	let map_ident = if let Ok(map_id) = map_ident.parse::<u16>() {
-		MapIdentifier::ID(map_id as i32)
-	} else {
-		MapIdentifier::Name(map_ident)
-	};
+	let map_ident = map_ident.parse::<MapIdentifier>()?;
 	debug!("> `map_ident`: {map_ident:#?}");
+
+	if let MapIdentifier::Name(map_name) = &map_ident {
+		if map_name.contains('&') {
+			return Err(Error::Input {
+				message: format!(
+					"Interpreted `{map_name}` as a map name. You probably meant to use a `?` instead of the first `&`."
+				),
+				expected: String::from("?` instead of `&"),
+			});
+		}
+	}
 
 	let filter = match map_ident {
 		MapIdentifier::ID(map_id) => format!("map.id = {map_id}"),

@@ -1,5 +1,3 @@
-use database::schemas::{steam_id64_to_account_id, steam_id_to_account_id};
-
 use {
 	super::{Record, RecordQuery},
 	crate::{routes::maps::Course, Error, GlobalState, Response, ResponseBody},
@@ -10,7 +8,9 @@ use {
 	chrono::NaiveDateTime,
 	database::{
 		crd::read::{get_map, get_player},
-		schemas::{account_id_to_steam_id64, FancyPlayer},
+		schemas::{
+			account_id_to_steam_id64, steam_id64_to_account_id, steam_id_to_account_id, FancyPlayer,
+		},
 	},
 	gokz_rs::prelude::*,
 	log::debug,
@@ -22,7 +22,7 @@ use {
 pub(crate) struct Params {
 	mode: Option<String>,
 	stage: Option<u8>,
-	map: Option<String>,
+	player: Option<String>,
 	has_teleports: Option<bool>,
 	created_after: Option<String>,
 	created_before: Option<String>,
@@ -30,30 +30,42 @@ pub(crate) struct Params {
 }
 
 pub(crate) async fn get(
-	Path(player_ident): Path<String>,
+	Path(map_ident): Path<String>,
 	Query(params): Query<Params>,
 	State(GlobalState { pool }): State<GlobalState>,
 ) -> Response<Vec<Record>> {
 	let start = Instant::now();
 	debug!("[records::player::get]");
-	debug!("> `player_ident`: {player_ident:#?}");
-	let player_ident = player_ident.parse::<PlayerIdentifier>()?;
-	debug!("> `player_ident`: {player_ident:#?}");
+	debug!("> `map_ident`: {map_ident:#?}");
+	let map_ident = map_ident.parse::<MapIdentifier>()?;
+	debug!("> `map_ident`: {map_ident:#?}");
 	debug!("> `params`: {params:#?}");
 
-	let player_id = match player_ident {
-		ident @ PlayerIdentifier::Name(_) => get_player(ident, &pool)
-			.await
-			.map(|player_row| player_row.id)?,
-		PlayerIdentifier::SteamID(steam_id) => steam_id_to_account_id(&steam_id.to_string())
-			.ok_or(Error::Input {
-				message: format!("Interpreted `{steam_id}` as a SteamID but it was invalid."),
-				expected: String::from("a valid SteamID"),
-			})?,
-		PlayerIdentifier::SteamID64(steam_id64) => steam_id64_to_account_id(steam_id64)?,
-	};
+	if let MapIdentifier::Name(map_name) = &map_ident {
+		if map_name.contains('&') {
+			return Err(Error::Input {
+				message: format!(
+					"Interpreted `{map_name}` as a map name. You probably meant to use a `?` instead of the first `&`."
+				),
+				expected: String::from("?` instead of `&"),
+			});
+		}
+	}
+
+	let map_id = get_map(map_ident, &pool)
+		.await
+		.map(|map_row| map_row.id)?;
 
 	let mut inner_query = String::new();
+
+	inner_query.push_str(&format!(
+		"\n  JOIN courses AS c ON c.id = r_inner.course_id AND c.map_id = {map_id} {}",
+		if let Some(stage) = params.stage {
+			format!("AND c.stage = {stage}")
+		} else {
+			String::new()
+		}
+	));
 
 	if let Some(mode) = params.mode {
 		let mode_id = mode.parse::<Mode>()? as u8;
@@ -62,32 +74,21 @@ pub(crate) async fn get(
 		));
 	}
 
-	match (params.stage, params.map) {
-		(Some(stage), None) => {
-			inner_query.push_str(&format!(
-				"\n  JOIN courses AS c ON c.id = r_inner.course_id AND c.stage = {stage}"
-			));
-		}
-		(None, Some(map_ident)) => {
-			let map_ident = map_ident.parse::<MapIdentifier>()?;
-			let map_id = get_map(map_ident, &pool)
+	if let Some(player_ident) = params.player {
+		let player_id = match player_ident.parse::<PlayerIdentifier>()? {
+			PlayerIdentifier::SteamID(steam_id) => steam_id_to_account_id(&steam_id.to_string())
+				.ok_or(Error::Input {
+					message: format!("Interpreted `{steam_id}` as a SteamID but it was invalid."),
+					expected: String::from("a valid SteamID"),
+				})?,
+			PlayerIdentifier::SteamID64(steam_id64) => steam_id64_to_account_id(steam_id64)?,
+			player_ident => get_player(player_ident, &pool)
 				.await
-				.map(|map| map.id)?;
-			inner_query.push_str(&format!(
-				"\n  JOIN courses AS c ON c.id = r_inner.course_id AND c.map_id = {map_id}"
-			));
-		}
-		(Some(stage), Some(map_ident)) => {
-			let map_ident = map_ident.parse::<MapIdentifier>()?;
-			let map_id = get_map(map_ident, &pool)
-				.await
-				.map(|map| map.id)?;
-			inner_query.push_str(&format!(
-				"\n  JOIN courses AS c ON c.id = r_inner.course_id AND c.stage = {stage} AND c.map_id = {map_id}"
-			));
-		}
-		(None, None) => {}
-	};
+				.map(|player_row| player_row.id)?,
+		};
+
+		inner_query.push_str(&format!("\n  JOIN players AS p ON p.id = {player_id}"));
+	}
 
 	let mut inner_filter = String::new();
 
@@ -171,20 +172,29 @@ pub(crate) async fn get(
 			  r.teleports AS teleports,
 			  r.created_on AS created_on
 			FROM (
-			  SELECT r_inner.course_id, MIN(r_inner.time) AS time
+			  SELECT
+			    r_inner.mode_id,
+			    r_inner.course_id,
+			    r_inner.player_id,
+			    r_inner.teleports,
+			    MIN(r_inner.time) AS time
 			  FROM records AS r_inner
-			  JOIN players AS p ON p.id = r_inner.player_id AND r_inner.player_id = {player_id}
 			  {inner_query}
 			  {inner_filter}
-			  GROUP BY r_inner.course_id
+			  GROUP BY r_inner.mode_id, r_inner.course_id, r_inner.player_id, r_inner.teleports
 			) AS pb
-			JOIN records AS r ON r.course_id = pb.course_id AND r.time = pb.time
+			JOIN records AS r
+			  ON r.mode_id = pb.mode_id
+			  AND r.course_id = pb.course_id
+			  AND r.player_id = pb.player_id
+			  AND r.teleports = pb.teleports
+			  AND r.time = pb.time
 			JOIN courses AS c ON c.id = r.course_id
 			JOIN maps AS map ON map.id = c.map_id
 			JOIN modes AS mode ON mode.id = r.mode_id
-			JOIN players AS p ON p.id = r.player_id AND r.player_id = {player_id}
+			JOIN players AS p ON p.id = r.player_id
 			JOIN servers AS s ON s.id = r.server_id
-			ORDER BY c.stage ASC, r.created_on DESC
+			ORDER BY c.stage ASC, r.time, r.created_on DESC
 			LIMIT {limit}
 		"#,
 	))

@@ -14,6 +14,7 @@ use {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Params {
+	name: Option<String>,
 	tier: Option<u8>,
 	courses: Option<u8>,
 	validated: Option<bool>,
@@ -31,38 +32,41 @@ pub(crate) async fn get(
 	debug!("> `params`: {params:#?}");
 
 	let mut filter = String::new();
+
+	if let Some(map_name) = params.name {
+		filter.push_str(&format!(r#"AND m.name LIKE "%{map_name}%""#));
+	}
+
 	if let Some(tier) = params.tier {
 		let tier = Tier::try_from(tier)?;
-		filter.push_str(&format!("AND map.tier = {} ", tier as u8));
+		filter.push_str(&format!("AND m.tier = {} ", tier as u8));
 	}
 
 	if let Some(courses) = params.courses {
-		filter.push_str(&format!("AND map.courses = {courses} "));
+		filter.push_str(&format!("AND m.courses = {courses} "));
 	}
 
 	if let Some(validated) = params.validated {
-		filter.push_str(&format!("AND map.validated = {validated} "));
+		filter.push_str(&format!("AND m.validated = {validated} "));
 	}
 
 	if let Some(created_by) = params.created_by {
 		let ident = PlayerIdentifier::try_from(created_by)?;
 		let player = get_player(ident, &pool).await?;
-		filter.push_str(&format!("AND map.created_by = {} ", player.id));
+		filter.push_str(&format!("AND m.created_by = {} ", player.id));
 	}
 
 	if let Some(approved_by) = params.approved_by {
 		let ident = PlayerIdentifier::try_from(approved_by)?;
 		let player = get_player(ident, &pool).await?;
-		filter.push_str(&format!("AND map.approved_by = {} ", player.id));
+		filter.push_str(&format!("AND m.approved_by = {} ", player.id));
 	}
 
-	let filter = format!(
-		"\n{}\nLIMIT {}",
-		filter.replacen("AND", "WHERE", 1),
-		params
-			.limit
-			.map_or(1500, |limit| limit.min(1500))
-	);
+	filter = filter.replacen("AND", "WHERE", 1);
+
+	let limit = params
+		.limit
+		.map_or(1500, |limit| limit.min(1500));
 
 	let result = sqlx::query_as::<_, MapRow>(&format!(
 		r#"
@@ -94,9 +98,10 @@ pub(crate) async fn get(
 		JOIN courses AS c ON c.map_id = m.id
 		JOIN players AS mapper ON mapper.id = m.created_by
 		JOIN players AS approver ON approver.id = m.approved_by
+		{filter}
 		GROUP BY m.id
 		ORDER BY m.created_on
-		{filter}
+		LIMIT {limit}
 		"#
 	))
 	.fetch_all(&pool)
