@@ -1,14 +1,15 @@
 use {
 	crate::schemas::*,
-	color_eyre::{eyre::eyre, Result as Eyre},
 	gokz_rs::prelude::*,
 	log::debug,
-	sqlx::{MySql, Pool},
+	sqlx::{Error as SQLError, MySql, Pool},
 };
 
-pub async fn get_mode(mode: Mode, pool: &Pool<MySql>) -> Eyre<ModeRow> {
+type Result<T> = std::result::Result<T, SQLError>;
+
+pub async fn get_mode(mode: Mode, pool: &Pool<MySql>) -> Result<ModeRow> {
 	debug!("Mode: {mode:?}");
-	Ok(sqlx::query_as::<_, ModeRow>(&format!(
+	sqlx::query_as::<_, ModeRow>(&format!(
 		r#"
 		SELECT * FROM modes
 		WHERE id = {}
@@ -16,16 +17,16 @@ pub async fn get_mode(mode: Mode, pool: &Pool<MySql>) -> Eyre<ModeRow> {
 		mode as u8
 	))
 	.fetch_one(pool)
-	.await?)
+	.await
 }
 
-pub async fn get_modes(pool: &Pool<MySql>) -> Eyre<Vec<ModeRow>> {
-	Ok(sqlx::query_as::<_, ModeRow>("SELECT * FROM modes")
+pub async fn get_modes(pool: &Pool<MySql>) -> Result<Vec<ModeRow>> {
+	sqlx::query_as::<_, ModeRow>("SELECT * FROM modes")
 		.fetch_all(pool)
-		.await?)
+		.await
 }
 
-pub async fn get_player(player: PlayerIdentifier, pool: &Pool<MySql>) -> Eyre<PlayerRow> {
+pub async fn get_player(player: PlayerIdentifier, pool: &Pool<MySql>) -> Result<PlayerRow> {
 	debug!("Player: {player:?}");
 	let filter = match player {
 		PlayerIdentifier::Name(player_name) => {
@@ -33,26 +34,27 @@ pub async fn get_player(player: PlayerIdentifier, pool: &Pool<MySql>) -> Eyre<Pl
 		}
 		PlayerIdentifier::SteamID(steam_id) => {
 			let account_id =
-				steam_id_to_account_id(&steam_id.to_string()).ok_or(eyre!("Bad SteamID"))?;
+				steam_id_to_account_id(&steam_id.to_string()).ok_or(SQLError::RowNotFound)?;
 			format!("id = {account_id}")
 		}
 		PlayerIdentifier::SteamID64(steam_id64) => {
-			let account_id = steam_id64_to_account_id(steam_id64)?;
+			let account_id =
+				steam_id64_to_account_id(steam_id64).map_err(|_| SQLError::RowNotFound)?;
 			format!("id = {account_id}")
 		}
 	};
 
-	Ok(sqlx::query_as::<_, PlayerRow>(&format!(
+	sqlx::query_as::<_, PlayerRow>(&format!(
 		r#"
 		SELECT * FROM players
 		WHERE {filter}
 		"#
 	))
 	.fetch_one(pool)
-	.await?)
+	.await
 }
 
-pub async fn get_server(server: String, pool: &Pool<MySql>) -> Eyre<ServerRow> {
+pub async fn get_server(server: String, pool: &Pool<MySql>) -> Result<ServerRow> {
 	debug!("Server: {server:?}");
 	let filter = if let Ok(server_id) = server.parse::<u16>() {
 		format!("id = {server_id}")
@@ -60,7 +62,7 @@ pub async fn get_server(server: String, pool: &Pool<MySql>) -> Eyre<ServerRow> {
 		format!(r#"name LIKE "%{server}%""#)
 	};
 
-	Ok(sqlx::query_as::<_, ServerRow>(&format!(
+	sqlx::query_as::<_, ServerRow>(&format!(
 		r#"
 		SELECT * FROM servers
 		WHERE {filter}
@@ -68,23 +70,23 @@ pub async fn get_server(server: String, pool: &Pool<MySql>) -> Eyre<ServerRow> {
 		"#
 	))
 	.fetch_one(pool)
-	.await?)
+	.await
 }
 
-pub async fn get_servers(pool: &Pool<MySql>) -> Eyre<Vec<ServerRow>> {
-	Ok(sqlx::query_as::<_, ServerRow>("SELECT * FROM servers")
+pub async fn get_servers(pool: &Pool<MySql>) -> Result<Vec<ServerRow>> {
+	sqlx::query_as::<_, ServerRow>("SELECT * FROM servers")
 		.fetch_all(pool)
-		.await?)
+		.await
 }
 
-pub async fn get_map(map: MapIdentifier, pool: &Pool<MySql>) -> Eyre<MapRow> {
+pub async fn get_map(map: MapIdentifier, pool: &Pool<MySql>) -> Result<MapRow> {
 	debug!("Map: {map:?}");
 	let filter = match map {
 		MapIdentifier::ID(map_id) => format!("id = {map_id}"),
 		MapIdentifier::Name(map_name) => format!(r#"name LIKE "%{map_name}%""#),
 	};
 
-	Ok(sqlx::query_as::<_, MapRow>(&format!(
+	sqlx::query_as::<_, MapRow>(&format!(
 		r#"
 		SELECT * FROM maps
 		WHERE {filter}
@@ -92,46 +94,46 @@ pub async fn get_map(map: MapIdentifier, pool: &Pool<MySql>) -> Eyre<MapRow> {
 		"#
 	))
 	.fetch_one(pool)
-	.await?)
+	.await
 }
 
-pub async fn get_maps(pool: &Pool<MySql>) -> Eyre<Vec<MapRow>> {
-	Ok(sqlx::query_as::<_, MapRow>("SELECT * FROM maps")
+pub async fn get_maps(pool: &Pool<MySql>) -> Result<Vec<MapRow>> {
+	sqlx::query_as::<_, MapRow>("SELECT * FROM maps")
 		.fetch_all(pool)
-		.await?)
+		.await
 }
 
-pub async fn get_course(course_id: u16, pool: &Pool<MySql>) -> Eyre<CourseRow> {
+pub async fn get_course(course_id: u16, pool: &Pool<MySql>) -> Result<CourseRow> {
 	debug!("Course: {course_id:?}");
-	Ok(sqlx::query_as::<_, CourseRow>(&format!(
+	sqlx::query_as::<_, CourseRow>(&format!(
 		r#"
 		SELECT * FROM courses
 		WHERE id = {course_id}
 		"#
 	))
 	.fetch_one(pool)
-	.await?)
+	.await
 }
 
-pub async fn get_courses(map_id: u16, pool: &Pool<MySql>) -> Eyre<Vec<CourseRow>> {
-	Ok(sqlx::query_as::<_, CourseRow>(&format!(
+pub async fn get_courses(map_id: u16, pool: &Pool<MySql>) -> Result<Vec<CourseRow>> {
+	sqlx::query_as::<_, CourseRow>(&format!(
 		r#"
 		SELECT * FROM courses
 		WHERE map_id = {map_id}
 		"#
 	))
 	.fetch_all(pool)
-	.await?)
+	.await
 }
 
-pub async fn get_record(record_id: u32, pool: &Pool<MySql>) -> Eyre<RecordRow> {
+pub async fn get_record(record_id: u32, pool: &Pool<MySql>) -> Result<RecordRow> {
 	debug!("Record: {record_id:?}");
-	Ok(sqlx::query_as::<_, RecordRow>(&format!(
+	sqlx::query_as::<_, RecordRow>(&format!(
 		r#"
 		SELECT * FROM records
 		WHERE id = {record_id}
 		"#
 	))
 	.fetch_one(pool)
-	.await?)
+	.await
 }

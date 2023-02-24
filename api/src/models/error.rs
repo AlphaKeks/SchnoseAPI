@@ -29,15 +29,15 @@ pub(crate) enum Error {
 impl Display for Error {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.write_str(&match self {
-			Error::Unknown => String::from("Unknown error occurred."),
-			Error::Infallible => String::from("Encountered error which should not have happened."),
-			Error::Custom { message } | Error::Database { message } | Error::GOKZ { message } => {
+			Self::Unknown => String::from("Unknown error occurred."),
+			Self::Infallible => String::from("Encountered error which should not have happened."),
+			Self::Custom { message } | Error::Database { message } | Error::GOKZ { message } => {
 				message.to_owned()
 			}
-			Error::Input { message, expected } => format!("{message} Expected `{expected}`."),
-			Error::JSON => String::from("Failed to parse JSON."),
-			Error::Date => String::from("Invalid Date format."),
-			Error::DateRange => String::from("Invalid Date range."),
+			Self::Input { message, expected } => format!("{message} Expected `{expected}`."),
+			Self::JSON => String::from("Failed to parse JSON."),
+			Self::Date => String::from("Invalid Date format."),
+			Self::DateRange => String::from("Invalid Date range."),
 		})
 	}
 }
@@ -45,8 +45,8 @@ impl Display for Error {
 impl IntoResponse for Error {
 	fn into_response(self) -> Response {
 		match self {
-			Error::Input { .. } => (StatusCode::BAD_REQUEST, Json(self.to_string())),
-			Error::Database { message } => (StatusCode::NO_CONTENT, Json(message)),
+			Self::Input { .. } => (StatusCode::BAD_REQUEST, Json(self.to_string())),
+			Self::Database { message } => (StatusCode::NO_CONTENT, Json(message)),
 			_ => (StatusCode::INTERNAL_SERVER_ERROR, Json(self.to_string())),
 		}
 		.into_response()
