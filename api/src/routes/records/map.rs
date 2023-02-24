@@ -84,7 +84,7 @@ pub(crate) async fn get(
 			    r_inner.mode_id,
 			    r_inner.course_id,
 			    r_inner.player_id,
-			    r_inner.teleports,
+			    CASE WHEN r_inner.teleports = 0 THEN 0 ELSE 1 END AS has_teleports,
 			    MIN(r_inner.time) AS time
 			  FROM records AS r_inner
 		"#,
@@ -174,7 +174,11 @@ pub(crate) async fn get(
 	if let Some(has_teleports) = params.has_teleports {
 		query
 			.push(if multiple_filters { " AND " } else { " WHERE " })
-			.push(format!(" r_inner.teleports {} 0", if has_teleports { ">" } else { "=" }));
+			.push(if has_teleports {
+				" CASE WHEN r_inner.teleports = 0 THEN 0 ELSE 1 END "
+			} else {
+				" CASE WHEN r_inner.teleports = 0 THEN 1 ELSE 0 END "
+			});
 	}
 
 	let limit = params
@@ -184,19 +188,19 @@ pub(crate) async fn get(
 	query
 		.push(
 			r#"
-			  GROUP BY r_inner.mode_id, r_inner.course_id, r_inner.player_id, r_inner.teleports
+			  GROUP BY r_inner.mode_id, r_inner.course_id, r_inner.player_id, has_teleports
 			) AS pb
 			JOIN records AS r
 			  ON r.mode_id = pb.mode_id
 			  AND r.course_id = pb.course_id
 			  AND r.player_id = pb.player_id
-			  AND r.teleports = pb.teleports
 			  AND r.time = pb.time
 			JOIN courses AS c ON c.id = r.course_id
 			JOIN maps AS map ON map.id = c.map_id
 			JOIN modes AS mode ON mode.id = r.mode_id
 			JOIN players AS p ON p.id = r.player_id
 			JOIN servers AS s ON s.id = r.server_id
+			GROUP BY r.mode_id, r.course_id, r.player_id, pb.has_teleports
 			ORDER BY c.stage ASC, r.time, r.created_on DESC
 			LIMIT
 			"#,
