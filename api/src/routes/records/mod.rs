@@ -17,6 +17,9 @@ pub(crate) use player::get as player;
 mod map;
 pub(crate) use map::get as map;
 
+mod place;
+pub(crate) use place::get as place;
+
 #[derive(Debug, Clone, FromRow)]
 pub struct RecordQuery {
 	pub id: u32,

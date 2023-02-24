@@ -46,9 +46,7 @@ async fn main() -> Eyre<()> {
 	let global_state = GlobalState { pool };
 
 	/* TODO:
-	 * `/players/:ident/completion`
 	 * `/records/top/world_records`
-	 * `/records/place/:record_id`
 	 * `/record_filters`
 	 * `/record_filters/:mode_ident/count`
 	 */
@@ -74,6 +72,7 @@ async fn main() -> Eyre<()> {
 		.route("/api/records", get(routes::records::index))
 		.route("/api/records/top/player/:ident", get(routes::records::player))
 		.route("/api/records/top/map/:ident", get(routes::records::map))
+		.route("/api/records/place/:id", get(routes::records::place)) // TODO: parameters?
 		.with_state(global_state);
 
 	axum::Server::bind(&addr)

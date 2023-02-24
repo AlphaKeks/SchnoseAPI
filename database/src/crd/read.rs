@@ -128,7 +128,7 @@ pub async fn get_maps(pool: &Pool<MySql>) -> Result<Vec<MapRow>> {
 		.await
 }
 
-pub async fn get_course(course_id: u16, pool: &Pool<MySql>) -> Result<CourseRow> {
+pub async fn get_course(course_id: u32, pool: &Pool<MySql>) -> Result<CourseRow> {
 	debug!("Course: {course_id:?}");
 	sqlx::query_as::<_, CourseRow>(&format!(
 		r#"
