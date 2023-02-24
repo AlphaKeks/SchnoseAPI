@@ -101,7 +101,7 @@ pub(crate) async fn get(
 		let player = get_player(ident, &pool).await?;
 		query
 			.push(if multiple_filters { " AND " } else { " WHERE " })
-			.push(" map.created_by = ")
+			.push(" map.approved_by = ")
 			.push_bind(player.id);
 	}
 
