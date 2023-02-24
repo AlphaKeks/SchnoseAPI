@@ -46,7 +46,7 @@ impl IntoResponse for Error {
 	fn into_response(self) -> Response {
 		match self {
 			Error::Input { .. } => (StatusCode::BAD_REQUEST, Json(self.to_string())),
-			Error::Database { message } => (StatusCode::NOT_FOUND, Json(message)),
+			Error::Database { message } => (StatusCode::NO_CONTENT, Json(message)),
 			_ => (StatusCode::INTERNAL_SERVER_ERROR, Json(self.to_string())),
 		}
 		.into_response()
