@@ -69,9 +69,11 @@ async fn main() -> Eyre<()> {
 		.route("/api/records/:id", get(routes::records::id))
 		.route("/api/records/", get(routes::records::index))
 		.route("/api/records", get(routes::records::index))
+		// TODO: when filtering by mode, exclude courses that aren't possible
 		.route("/api/records/top/player/:ident", get(routes::records::player))
 		.route("/api/records/top/map/:ident", get(routes::records::map))
-		.route("/api/records/place/:id", get(routes::records::place)) // TODO: parameters?
+		// TODO: parameters?
+		.route("/api/records/place/:id", get(routes::records::place))
 		.with_state(global_state);
 
 	axum::Server::bind(&addr)
