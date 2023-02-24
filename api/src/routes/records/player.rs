@@ -79,18 +79,18 @@ pub(crate) async fn get(
 
 	if let Some(stage) = params.stage {
 		query
-			.push(" AND c.stage = ")
+			.push(" JOIN courses AS c ON c.id = r_inner.course_id AND c.stage = ")
 			.push_bind(stage);
 	}
 
-	if let Some(mode) = params.mode {
+	if let Some(mode) = &params.mode {
 		let mode_id = mode.parse::<Mode>()? as u8;
 		query
 			.push(" JOIN modes AS mode ON mode.id = r_inner.mode_id AND mode.id = ")
 			.push_bind(mode_id);
 	}
 
-	if let Some(map_ident) = params.map {
+	if let Some(map_ident) = &params.map {
 		let map_ident = map_ident.parse::<MapIdentifier>()?;
 		let map_id = if let MapIdentifier::ID(map_id) = map_ident {
 			map_id as u16
@@ -107,9 +107,9 @@ pub(crate) async fn get(
 
 	let mut multiple_filters = false;
 
-	match (params.created_after, params.created_before) {
+	match (&params.created_after, &params.created_before) {
 		(Some(created_after), None) => {
-			let created_after = NaiveDateTime::parse_from_str(&created_after, "%Y-%m-%dT%H:%M:%S")?
+			let created_after = NaiveDateTime::parse_from_str(created_after, "%Y-%m-%dT%H:%M:%S")?
 				.format("%Y-%m-%d %H:%M:%S")
 				.to_string();
 
@@ -121,7 +121,7 @@ pub(crate) async fn get(
 		}
 		(None, Some(created_before)) => {
 			let created_before =
-				NaiveDateTime::parse_from_str(&created_before, "%Y-%m-%dT%H:%M:%S")?
+				NaiveDateTime::parse_from_str(created_before, "%Y-%m-%dT%H:%M:%S")?
 					.format("%Y-%m-%d %H:%M:%S")
 					.to_string();
 
@@ -132,9 +132,9 @@ pub(crate) async fn get(
 			multiple_filters = true;
 		}
 		(Some(created_after), Some(created_before)) => {
-			let created_after = NaiveDateTime::parse_from_str(&created_after, "%Y-%m-%dT%H:%M:%S")?;
+			let created_after = NaiveDateTime::parse_from_str(created_after, "%Y-%m-%dT%H:%M:%S")?;
 			let created_before =
-				NaiveDateTime::parse_from_str(&created_before, "%Y-%m-%dT%H:%M:%S")?;
+				NaiveDateTime::parse_from_str(created_before, "%Y-%m-%dT%H:%M:%S")?;
 
 			if created_after.timestamp() > created_before.timestamp() {
 				return Err(Error::DateRange);
@@ -168,13 +168,102 @@ pub(crate) async fn get(
 			JOIN courses AS c ON c.id = r.course_id
 			JOIN maps AS map ON map.id = c.map_id
 			JOIN modes AS mode ON mode.id = r.mode_id
-			JOIN players AS p ON p.id = r.player_id AND r.player_id = 
+			JOIN players AS p ON p.id = r.player_id AND r.player_id =
 			"#,
 		)
 		.push_bind(player_id)
+		.push(" JOIN servers AS s ON s.id = r.server_id ");
+
+	multiple_filters = false;
+
+	if let Some(stage) = params.stage {
+		query
+			.push(" WHERE c.id = r.course_id AND c.stage = ")
+			.push_bind(stage);
+		multiple_filters = true;
+	}
+
+	if let Some(mode) = params.mode {
+		let mode_id = mode.parse::<Mode>()? as u8;
+		query
+			.push(if multiple_filters { " AND " } else { " WHERE " })
+			.push(" mode.id = r.mode_id AND mode.id = ")
+			.push_bind(mode_id);
+		multiple_filters = true;
+	}
+
+	if let Some(map_ident) = params.map {
+		let map_ident = map_ident.parse::<MapIdentifier>()?;
+		let map_id = if let MapIdentifier::ID(map_id) = map_ident {
+			map_id as u16
+		} else {
+			get_map(map_ident, &pool)
+				.await
+				.map(|map_row| map_row.id)?
+		};
+
+		query
+			.push(if multiple_filters { " AND " } else { " WHERE " })
+			.push(" map.id = ")
+			.push_bind(map_id);
+	}
+
+	match (params.created_after, params.created_before) {
+		(Some(created_after), None) => {
+			let created_after = NaiveDateTime::parse_from_str(&created_after, "%Y-%m-%dT%H:%M:%S")?
+				.format("%Y-%m-%d %H:%M:%S")
+				.to_string();
+
+			query
+				.push(if multiple_filters { " AND " } else { " WHERE " })
+				.push(" r.created_on > ")
+				.push_bind(created_after);
+
+			multiple_filters = true;
+		}
+		(None, Some(created_before)) => {
+			let created_before =
+				NaiveDateTime::parse_from_str(&created_before, "%Y-%m-%dT%H:%M:%S")?
+					.format("%Y-%m-%d %H:%M:%S")
+					.to_string();
+
+			query
+				.push(if multiple_filters { " AND " } else { " WHERE " })
+				.push(" r.created_on < ")
+				.push_bind(created_before);
+
+			multiple_filters = true;
+		}
+		(Some(created_after), Some(created_before)) => {
+			let created_after = NaiveDateTime::parse_from_str(&created_after, "%Y-%m-%dT%H:%M:%S")?;
+			let created_before =
+				NaiveDateTime::parse_from_str(&created_before, "%Y-%m-%dT%H:%M:%S")?;
+
+			if created_after.timestamp() > created_before.timestamp() {
+				return Err(Error::DateRange);
+			}
+
+			query
+				.push(if multiple_filters { " AND " } else { " WHERE " })
+				.push(" r.created_on > ")
+				.push_bind(created_after.to_string())
+				.push(" AND r_inner.created_on < ")
+				.push_bind(created_before.to_string());
+
+			multiple_filters = true;
+		}
+		_ => {}
+	};
+
+	if let Some(has_teleports) = params.has_teleports {
+		query
+			.push(if multiple_filters { " AND " } else { " WHERE " })
+			.push(format!(" r.teleports {} 0", if has_teleports { ">" } else { "=" }));
+	}
+
+	query
 		.push(
 			r#"
-			JOIN servers AS s ON s.id = r.server_id
 			ORDER BY r.created_on DESC, c.stage ASC
 			LIMIT
 			"#,

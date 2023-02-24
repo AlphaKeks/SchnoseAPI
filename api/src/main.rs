@@ -46,8 +46,11 @@ async fn main() -> Eyre<()> {
 	let global_state = GlobalState { pool };
 
 	/* TODO:
+	 * `/players/:ident/completion`
 	 * `/records/top/world_records`
 	 * `/records/place/:record_id`
+	 * `/record_filters`
+	 * `/record_filters/:mode_ident/count`
 	 */
 	let router = Router::new()
 		.route("/", get(routes::index))
@@ -59,6 +62,7 @@ async fn main() -> Eyre<()> {
 		.route("/api/players/:ident", get(routes::players::ident))
 		.route("/api/players/", get(routes::players::index))
 		.route("/api/players", get(routes::players::index))
+		.route("/api/players/:ident/completion", get(routes::players::completion))
 		.route("/api/servers/:ident", get(routes::servers::ident))
 		.route("/api/servers/", get(routes::servers::index))
 		.route("/api/servers", get(routes::servers::index))

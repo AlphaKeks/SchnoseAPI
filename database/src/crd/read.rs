@@ -2,22 +2,26 @@ use {
 	crate::schemas::*,
 	gokz_rs::prelude::*,
 	log::debug,
-	sqlx::{Error as SQLError, MySql, Pool},
+	sqlx::{Error as SQLError, MySql, Pool, QueryBuilder},
 };
 
 type Result<T> = std::result::Result<T, SQLError>;
 
 pub async fn get_mode(mode: Mode, pool: &Pool<MySql>) -> Result<ModeRow> {
 	debug!("Mode: {mode:?}");
-	sqlx::query_as::<_, ModeRow>(&format!(
+	let mut query = QueryBuilder::new(
 		r#"
 		SELECT * FROM modes
-		WHERE id = {}
+		WHERE id =
 		"#,
-		mode as u8
-	))
-	.fetch_one(pool)
-	.await
+	);
+
+	query.push_bind(mode as u8);
+
+	query
+		.build_query_as()
+		.fetch_one(pool)
+		.await
 }
 
 pub async fn get_modes(pool: &Pool<MySql>) -> Result<Vec<ModeRow>> {
@@ -28,49 +32,64 @@ pub async fn get_modes(pool: &Pool<MySql>) -> Result<Vec<ModeRow>> {
 
 pub async fn get_player(player: PlayerIdentifier, pool: &Pool<MySql>) -> Result<PlayerRow> {
 	debug!("Player: {player:?}");
-	let filter = match player {
+	let mut query = QueryBuilder::new(
+		r#"
+		SELECT * FROM players
+		WHERE
+		"#,
+	);
+
+	match player {
 		PlayerIdentifier::Name(player_name) => {
-			format!(r#"name LIKE "{player_name}%""#)
+			query
+				.push("name LIKE ")
+				.push_bind(format!(r#"{player_name}%"#));
 		}
 		PlayerIdentifier::SteamID(steam_id) => {
 			let account_id =
 				steam_id_to_account_id(&steam_id.to_string()).ok_or(SQLError::RowNotFound)?;
-			format!("id = {account_id}")
+			query
+				.push("id = ")
+				.push_bind(account_id);
 		}
 		PlayerIdentifier::SteamID64(steam_id64) => {
 			let account_id =
 				steam_id64_to_account_id(steam_id64).map_err(|_| SQLError::RowNotFound)?;
-			format!("id = {account_id}")
+			query
+				.push("id = ")
+				.push_bind(account_id);
 		}
 	};
 
-	sqlx::query_as::<_, PlayerRow>(&format!(
-		r#"
-		SELECT * FROM players
-		WHERE {filter}
-		"#
-	))
-	.fetch_one(pool)
-	.await
+	query
+		.build_query_as()
+		.fetch_one(pool)
+		.await
 }
 
 pub async fn get_server(server: String, pool: &Pool<MySql>) -> Result<ServerRow> {
 	debug!("Server: {server:?}");
-	let filter = if let Ok(server_id) = server.parse::<u16>() {
-		format!("id = {server_id}")
-	} else {
-		format!(r#"name LIKE "%{server}%""#)
-	};
-
-	sqlx::query_as::<_, ServerRow>(&format!(
+	let mut query = QueryBuilder::new(
 		r#"
 		SELECT * FROM servers
-		WHERE {filter}
-		LIMIT 1
-		"#
-	))
-	.fetch_one(pool)
-	.await
+		WHERE
+		"#,
+	);
+
+	if let Ok(server_id) = server.parse::<u16>() {
+		query.push("id = ").push_bind(server_id);
+	} else {
+		query
+			.push("name LIKE ")
+			.push_bind(format!(r#"%{server}%"#));
+	};
+
+	query.push(" LIMIT 1 ");
+
+	query
+		.build_query_as()
+		.fetch_one(pool)
+		.await
 }
 
 pub async fn get_servers(pool: &Pool<MySql>) -> Result<Vec<ServerRow>> {
@@ -81,20 +100,26 @@ pub async fn get_servers(pool: &Pool<MySql>) -> Result<Vec<ServerRow>> {
 
 pub async fn get_map(map: MapIdentifier, pool: &Pool<MySql>) -> Result<MapRow> {
 	debug!("Map: {map:?}");
-	let filter = match map {
-		MapIdentifier::ID(map_id) => format!("id = {map_id}"),
-		MapIdentifier::Name(map_name) => format!(r#"name LIKE "%{map_name}%""#),
-	};
-
-	sqlx::query_as::<_, MapRow>(&format!(
+	let mut query = QueryBuilder::new(
 		r#"
 		SELECT * FROM maps
-		WHERE {filter}
-		LIMIT 1
-		"#
-	))
-	.fetch_one(pool)
-	.await
+		WHERE
+		"#,
+	);
+
+	match map {
+		MapIdentifier::ID(map_id) => query.push("id = ").push_bind(map_id),
+		MapIdentifier::Name(map_name) => query
+			.push("name LIKE ")
+			.push_bind(format!(r#"%{map_name}%"#)),
+	};
+
+	query.push(" LIMIT 1 ");
+
+	query
+		.build_query_as()
+		.fetch_one(pool)
+		.await
 }
 
 pub async fn get_maps(pool: &Pool<MySql>) -> Result<Vec<MapRow>> {
