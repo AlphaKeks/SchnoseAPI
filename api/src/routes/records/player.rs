@@ -181,12 +181,17 @@ pub(crate) async fn get(
 		)
 		.push_bind(params.limit.unwrap_or(100));
 
-	let mut result = Vec::new();
-	for record_query in query
+	let query_result = query
 		.build_query_as::<RecordQuery>()
 		.fetch_all(&pool)
-		.await?
-	{
+		.await?;
+
+	if query_result.is_empty() {
+		return Err(sqlx::Error::RowNotFound.into());
+	}
+
+	let mut result = Vec::new();
+	for record_query in query_result {
 		let steam_id64 = account_id_to_steam_id64(record_query.player_id);
 		let steam_id = SteamID::from(steam_id64);
 

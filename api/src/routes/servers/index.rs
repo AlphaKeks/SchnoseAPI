@@ -120,7 +120,13 @@ pub(crate) async fn get(
 	let result = query
 		.build_query_as::<ServerQuery>()
 		.fetch_all(&pool)
-		.await?
+		.await?;
+
+	if result.is_empty() {
+		return Err(sqlx::Error::RowNotFound.into());
+	}
+
+	let result = result
 		.into_iter()
 		.map(|server_query| {
 			let owner_steam_id64 = account_id_to_steam_id64(server_query.owner_id);

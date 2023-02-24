@@ -138,7 +138,13 @@ pub(crate) async fn get(
 	let result = query
 		.build_query_as::<MapRow>()
 		.fetch_all(&pool)
-		.await?
+		.await?;
+
+	if result.is_empty() {
+		return Err(sqlx::Error::RowNotFound.into());
+	}
+
+	let result = result
 		.into_iter()
 		.filter_map(|map_row| {
 			let courses = serde_json::from_str::<Vec<Course>>(&map_row.courses).ok()?;
