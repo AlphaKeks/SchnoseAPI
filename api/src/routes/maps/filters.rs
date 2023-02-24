@@ -1,11 +1,11 @@
 use {
-	super::{Course, Map, MapRow},
-	crate::{GlobalState, Response, ResponseBody},
+	super::{Filter, FiltersRow},
+	crate::{Error, GlobalState, Response, ResponseBody},
 	axum::{
 		extract::{Query, State},
 		Json,
 	},
-	database::{crd::read::*, schemas::account_id_to_steam_id64},
+	database::crd::read::*,
 	gokz_rs::prelude::*,
 	log::debug,
 	serde::Deserialize,
@@ -16,18 +16,18 @@ use {
 #[derive(Debug, Deserialize)]
 pub(crate) struct Params {
 	name: Option<String>,
+	mode: Option<String>,
 	tier: Option<u8>,
 	stage: Option<u8>,
 	validated: Option<bool>,
 	created_by: Option<String>,
 	approved_by: Option<String>,
-	limit: Option<u32>,
 }
 
 pub(crate) async fn get(
 	Query(params): Query<Params>,
 	State(GlobalState { pool }): State<GlobalState>,
-) -> Response<Vec<Map>> {
+) -> Response<Vec<Filter>> {
 	let start = Instant::now();
 	debug!("[maps::get]");
 	debug!("> `params`: {params:#?}");
@@ -35,31 +35,20 @@ pub(crate) async fn get(
 	let mut query = QueryBuilder::new(
 		r#"
 		SELECT
-		  map.id,
-		  map.name,
-		  c.kzt_difficulty AS tier,
 		  JSON_ARRAYAGG(
 		    JSON_OBJECT(
-		      "id", c.id,
+		      "course_id", c.id,
+		      "map_id", map.id,
+		      "map_name", map.name,
 		      "stage", c.stage,
 		      "kzt", c.kzt,
-		      "kzt_difficulty", c.kzt_difficulty,
 		      "skz", c.skz,
-		      "skz_difficulty", c.skz_difficulty,
-		      "vnl", c.vnl,
-		      "vnl_difficulty", c.vnl_difficulty
+		      "vnl", c.vnl
 		    )
-		  ) AS courses,
-		  map.validated,
-		  mapper.name AS mapper_name,
-		  map.created_by,
-		  approver.name AS approver_name,
-		  map.approved_by,
-		  map.filesize,
-		  map.created_on,
-		  map.updated_on
+		  ) AS courses
 		FROM (
-		  SELECT * FROM maps AS map
+		  SELECT map.* FROM maps AS map
+		  JOIN courses AS c ON c.map_id = map.id
 		"#,
 	);
 
@@ -73,11 +62,19 @@ pub(crate) async fn get(
 		multiple_filters = true;
 	}
 
-	if let Some(courses) = params.stage {
+	if let Some(mode_ident) = params.mode {
+		let mode = mode_ident.parse::<Mode>()?;
+		query
+			.push(" WHERE ")
+			.push(&format!(" c.{} = 1", mode.short().to_lowercase()));
+		multiple_filters = true;
+	}
+
+	if let Some(stage) = params.stage {
 		query
 			.push(if multiple_filters { " AND " } else { " WHERE " })
-			.push(" map.courses = ")
-			.push_bind(courses);
+			.push(" c.stage = ")
+			.push_bind(stage);
 	}
 
 	if let Some(validated) = params.validated {
@@ -105,19 +102,13 @@ pub(crate) async fn get(
 			.push_bind(player.id);
 	}
 
-	query
-		.push(" LIMIT ")
-		.push_bind(
-			params
-				.limit
-				.map_or(1500, |limit| limit.min(1500)),
-		)
-		.push(
-			r#"
+	query.push(
+		r#"
+			  GROUP BY c.map_id
 			) AS map
 			JOIN courses AS c ON c.map_id = map.id
 			"#,
-		);
+	);
 
 	if let Some(tier) = params.tier {
 		let tier = Tier::try_from(tier)?;
@@ -128,42 +119,16 @@ pub(crate) async fn get(
 
 	query.push(
 		r#"
-		JOIN players AS mapper ON mapper.id = map.created_by
-		JOIN players AS approver ON approver.id = map.approved_by
-		GROUP BY map.id
-		ORDER BY map.name
+		ORDER BY map.name, c.stage
 		"#,
 	);
 
 	let result = query
-		.build_query_as::<MapRow>()
-		.fetch_all(&pool)
+		.build_query_as::<FiltersRow>()
+		.fetch_one(&pool)
 		.await?;
 
-	if result.is_empty() {
-		return Err(sqlx::Error::RowNotFound.into());
-	}
-
-	let result = result
-		.into_iter()
-		.filter_map(|map_row| {
-			let courses = serde_json::from_str::<Vec<Course>>(&map_row.courses).ok()?;
-			Some(Map {
-				id: map_row.id,
-				name: map_row.name,
-				tier: courses[0].kzt_difficulty,
-				courses,
-				validated: map_row.validated,
-				mapper_name: map_row.mapper_name,
-				mapper_steam_id64: account_id_to_steam_id64(map_row.created_by).to_string(),
-				approver_name: map_row.approver_name,
-				approver_steam_id64: account_id_to_steam_id64(map_row.approved_by).to_string(),
-				filesize: map_row.filesize.to_string(),
-				created_on: map_row.created_on.to_string(),
-				updated_on: map_row.updated_on.to_string(),
-			})
-		})
-		.collect();
+	let result = serde_json::from_str::<Vec<Filter>>(&result.courses).map_err(|_| Error::JSON)?;
 
 	Ok(Json(ResponseBody {
 		result,

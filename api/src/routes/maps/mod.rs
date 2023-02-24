@@ -9,6 +9,9 @@ pub(crate) use index::get as index;
 mod ident;
 pub(crate) use ident::get as ident;
 
+mod filters;
+pub(crate) use filters::get as filters;
+
 #[derive(Debug, Clone, FromRow)]
 pub(crate) struct MapRow {
 	pub(crate) id: u16,
@@ -53,6 +56,25 @@ pub(crate) struct Map {
 	pub(crate) filesize: String,
 	pub(crate) created_on: String,
 	pub(crate) updated_on: String,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub(crate) struct FiltersRow {
+	pub(crate) courses: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct Filter {
+	pub(crate) map_name: String,
+	pub(crate) map_id: u16,
+	pub(crate) stage: u8,
+	pub(crate) course_id: u32,
+	#[serde(deserialize_with = "number_to_bool")]
+	pub(crate) kzt: bool,
+	#[serde(deserialize_with = "number_to_bool")]
+	pub(crate) skz: bool,
+	#[serde(deserialize_with = "number_to_bool")]
+	pub(crate) vnl: bool,
 }
 
 pub fn number_to_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>

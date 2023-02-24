@@ -93,6 +93,7 @@ pub(crate) async fn get(
 		.fetch_one(&pool)
 		.await?;
 
+	dbg!(&map_row);
 	let courses = serde_json::from_str::<Vec<Course>>(&map_row.courses).map_err(|_| Error::JSON)?;
 
 	let result = Map {

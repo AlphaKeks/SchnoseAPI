@@ -47,8 +47,6 @@ async fn main() -> Eyre<()> {
 
 	/* TODO:
 	 * `/records/top/world_records`
-	 * `/record_filters`
-	 * `/record_filters/:mode_ident/count`
 	 */
 	let router = Router::new()
 		.route("/", get(routes::index))
@@ -67,6 +65,7 @@ async fn main() -> Eyre<()> {
 		.route("/api/maps/:ident", get(routes::maps::ident))
 		.route("/api/maps/", get(routes::maps::index))
 		.route("/api/maps", get(routes::maps::index))
+		.route("/api/maps/filters", get(routes::maps::filters))
 		.route("/api/records/:id", get(routes::records::id))
 		.route("/api/records/", get(routes::records::index))
 		.route("/api/records", get(routes::records::index))
