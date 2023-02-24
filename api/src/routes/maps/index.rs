@@ -73,14 +73,6 @@ pub(crate) async fn get(
 		multiple_filters = true;
 	}
 
-	if let Some(tier) = params.tier {
-		let tier = Tier::try_from(tier)?;
-		query
-			.push(if multiple_filters { " AND " } else { " WHERE " })
-			.push(" map.tier = ")
-			.push_bind(tier as u8);
-	}
-
 	if let Some(courses) = params.stages {
 		query
 			.push(if multiple_filters { " AND " } else { " WHERE " })
@@ -120,16 +112,28 @@ pub(crate) async fn get(
 				.limit
 				.map_or(1500, |limit| limit.min(1500)),
 		)
-		.push(") AS map")
 		.push(
 			r#"
+			) AS map
 			JOIN courses AS c ON c.map_id = map.id
-			JOIN players AS mapper ON mapper.id = map.created_by
-			JOIN players AS approver ON approver.id = map.approved_by
-			GROUP BY map.id
-			ORDER BY map.created_on
 			"#,
 		);
+
+	if let Some(tier) = params.tier {
+		let tier = Tier::try_from(tier)?;
+		query
+			.push(" AND c.kzt_difficulty = ")
+			.push_bind(tier as u8);
+	}
+
+	query.push(
+		r#"
+		JOIN players AS mapper ON mapper.id = map.created_by
+		JOIN players AS approver ON approver.id = map.approved_by
+		GROUP BY map.id
+		ORDER BY map.name
+		"#,
+	);
 
 	let result = query
 		.build_query_as::<MapRow>()
