@@ -84,10 +84,10 @@ pub(crate) async fn get(
 	}
 
 	if let Some(mode) = &params.mode {
-		let mode_id = mode.parse::<Mode>()? as u8;
+		let mode = mode.parse::<Mode>()?;
 		query
 			.push(" JOIN modes AS mode ON mode.id = r_inner.mode_id AND mode.id = ")
-			.push_bind(mode_id);
+			.push_bind(mode as u8);
 	}
 
 	if let Some(map_ident) = &params.map {
