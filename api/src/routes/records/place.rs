@@ -1,5 +1,5 @@
 use {
-	crate::{GlobalState, Response, ResponseBody},
+	crate::{Error, GlobalState, Response, ResponseBody},
 	axum::{
 		extract::{Path, State},
 		Json,
@@ -97,26 +97,28 @@ pub(crate) async fn get(
 		stage,
 		map_id,
 		mode_id,
-		if_no_teleports,
-		if_teleports,
+		if teleports == 0 { if_no_teleports } else { if_teleports },
+		if teleports == 0 { if_teleports } else { if_no_teleports },
 		map_id,
 		stage,
 		mode_id
 	)
 	.fetch_all(&pool)
-	.await?
-	.into_iter()
-	.enumerate()
-	.find_map(|(i, row)| {
-		if row.id == id {
-			return Some(i as u32 + 1u32);
-		}
-		None
-	})
-	.expect(
-		"Record must exist if we successfully get it by id and then fetch a leaderboard with
-		the appropriate parameters.",
-	);
+	.await?;
+
+	let result = result
+		.into_iter()
+		.enumerate()
+		.find_map(|(i, record)| {
+			if record.id == id {
+				return Some(i as u32 + 1u32);
+			}
+			None
+		})
+		.ok_or(Error::Database {
+			// FIXME: This should never happen but sometimes it does.
+			message: String::from("No place found."),
+		})?;
 
 	Ok(Json(ResponseBody {
 		result,
