@@ -8,6 +8,7 @@ members = [
 	"scripts/filter_json",
 	"scripts/fetch_maps",
 	"scripts/record_scraper",
+	"scripts/ban_scraper",
 	"database",
 	"api",
 ]

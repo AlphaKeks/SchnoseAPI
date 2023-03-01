@@ -58,10 +58,7 @@ async fn main() -> Eyre<()> {
 	let config_file = std::fs::read_to_string(args.config_file)?;
 	let config: Config = toml::from_str(&config_file)?;
 
-	std::env::set_var(
-		"RUST_LOG",
-		if args.debug { "DEBUG" } else { "record_scraper=INFO" },
-	);
+	std::env::set_var("RUST_LOG", if args.debug { "DEBUG" } else { "record_scraper=INFO" });
 	env_logger::init();
 
 	let pool = MySqlPoolOptions::new()
@@ -194,7 +191,7 @@ async fn main() -> Eyre<()> {
 							record
 								.player_name
 								.unwrap_or_else(|| String::from("unknown")),
-							false,
+							0,
 						)],
 						&pool,
 					)
@@ -209,6 +206,7 @@ async fn main() -> Eyre<()> {
 					&pool,
 				)
 				.await?;
+				info!("Inserted record `{record_id}`.");
 			}
 		}
 	};
