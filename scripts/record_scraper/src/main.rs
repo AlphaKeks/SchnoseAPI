@@ -1,8 +1,6 @@
 #![deny(clippy::perf)]
 #![warn(clippy::suspicious, clippy::style)]
 
-use gokz_rs::GlobalAPI;
-
 use {
 	chrono::{DateTime, NaiveDateTime, Utc},
 	clap::{Parser, Subcommand},
@@ -14,11 +12,15 @@ use {
 	gokz_rs::{
 		prelude::{Mode as GOKZMode, *},
 		records::Record as GlobalRecord,
+		GlobalAPI,
 	},
 	log::info,
 	serde::{Deserialize, Serialize},
 	sqlx::mysql::MySqlPoolOptions,
-	std::{path::PathBuf, time::Instant},
+	std::{
+		path::PathBuf,
+		time::{Duration, Instant},
+	},
 };
 
 #[derive(Debug, Parser)]
@@ -43,7 +45,7 @@ enum Mode {
 	/// Read records from a file and insert them into the database.
 	InputFile { file: PathBuf },
 	/// Scrape records from the GlobalAPI and insert them into the database.
-	Scrape { start_id: u32 },
+	Scrape { start_id: Option<u32> },
 }
 
 #[derive(Debug, Deserialize)]
@@ -156,7 +158,18 @@ async fn main() -> Eyre<()> {
 		Mode::Scrape { start_id } => {
 			let client = gokz_rs::Client::new();
 
+			let start_id = if let Some(id) = start_id {
+				id
+			} else {
+				let RecordId(id) = sqlx::query_as("SELECT MAX(id) FROM records")
+					.fetch_one(&pool)
+					.await?;
+				id + 1
+			};
+
 			for i in start_id.. {
+				std::thread::sleep(Duration::from_millis(700));
+
 				let record = loop {
 					if let Ok(record) = GlobalAPI::get_record(i as i32, &client).await {
 						break record;
@@ -245,3 +258,6 @@ pub struct DatabaseRecord {
 	teleports: u32,
 	created_on: String,
 }
+
+#[derive(sqlx::FromRow)]
+struct RecordId(u32);
