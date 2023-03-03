@@ -175,6 +175,7 @@ async fn main() -> Eyre<()> {
 						break record;
 					} else {
 						info!("No new records...");
+						std::thread::sleep(Duration::from_millis(700));
 						continue;
 					}
 				};
