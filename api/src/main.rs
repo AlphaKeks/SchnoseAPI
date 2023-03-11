@@ -8,6 +8,8 @@ use {
 	std::{net::SocketAddr, path::PathBuf},
 };
 
+mod ser_date;
+
 mod models;
 pub(crate) use models::{error::Error, Response, ResponseBody};
 

@@ -22,7 +22,7 @@ pub(crate) async fn get(State(GlobalState { pool }): State<GlobalState>) -> Resp
 				name: mode_row.name,
 				name_short: mode.short(),
 				name_long: mode.to_string(),
-				created_on: mode_row.created_on.to_string(),
+				created_on: mode_row.created_on,
 			})
 		})
 		.collect();

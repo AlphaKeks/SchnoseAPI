@@ -81,7 +81,7 @@ pub(crate) async fn get(
 		server_name: record_query.server_name,
 		time: record_query.time,
 		teleports: record_query.teleports,
-		created_on: record_query.created_on.to_string(),
+		created_on: record_query.created_on,
 	};
 
 	Ok(Json(ResponseBody {

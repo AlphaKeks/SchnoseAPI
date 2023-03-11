@@ -1,6 +1,7 @@
 use {
 	clap::Parser,
 	color_eyre::Result as Eyre,
+	gokz_rs::{prelude::*, GlobalAPI},
 	log::{debug, info},
 	serde::{Deserialize, Serialize},
 	serde_json::Value as JsonValue,
@@ -51,10 +52,7 @@ async fn main() -> Eyre<()> {
 	let config: Config = toml::from_str(&config_file)?;
 	let client = gokz_rs::Client::new();
 
-	std::env::set_var(
-		"RUST_LOG",
-		if args.debug { "fetch_maps=DEBUG" } else { "fetch_maps=INFO" },
-	);
+	std::env::set_var("RUST_LOG", if args.debug { "fetch_maps=DEBUG" } else { "fetch_maps=INFO" });
 	env_logger::init();
 
 	let url = format!("{}/{}?key={}", URL, args.sheet, config.google_api_key);
@@ -67,7 +65,8 @@ async fn main() -> Eyre<()> {
 		.json::<Response>()
 		.await?;
 
-	let maps = data
+	let mut maps = Vec::new();
+	for map in data
 		.sheets
 		.remove(0)
 		.data
@@ -79,6 +78,7 @@ async fn main() -> Eyre<()> {
 			let row = row
 				.values
 				.into_iter()
+				.flatten()
 				.filter_map(|col| col.formatted_value)
 				.collect::<Vec<_>>();
 
@@ -101,8 +101,16 @@ async fn main() -> Eyre<()> {
 				created_by: None,
 				approved_by: None,
 			})
-		})
-		.collect::<Vec<_>>();
+		}) {
+		maps.push(
+			GlobalAPI::get_map(&MapIdentifier::Name(map.name.clone()), &client)
+				.await
+				.map(|global_map| Map {
+					id: Some(global_map.id as u32),
+					..map
+				})?,
+		);
+	}
 
 	debug!("Maps: {:#?}", &maps);
 	info!("{} maps", maps.len());
@@ -248,7 +256,7 @@ struct SheetData {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Row {
-	values: Vec<RowValue>,
+	values: Option<Vec<RowValue>>,
 }
 
 #[allow(unused)]

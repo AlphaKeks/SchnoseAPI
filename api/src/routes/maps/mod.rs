@@ -1,4 +1,5 @@
 use {
+	crate::ser_date::ser_date,
 	serde::{de::Error, Deserialize, Deserializer, Serialize},
 	sqlx::{types::time::PrimitiveDateTime, FromRow},
 };
@@ -54,8 +55,10 @@ pub(crate) struct Map {
 	pub(crate) approver_name: String,
 	pub(crate) approver_steam_id64: String,
 	pub(crate) filesize: String,
-	pub(crate) created_on: String,
-	pub(crate) updated_on: String,
+	#[serde(serialize_with = "ser_date")]
+	pub(crate) created_on: PrimitiveDateTime,
+	#[serde(serialize_with = "ser_date")]
+	pub(crate) updated_on: PrimitiveDateTime,
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]

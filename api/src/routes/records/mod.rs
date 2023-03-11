@@ -1,7 +1,8 @@
 use {
 	super::maps::Course,
+	crate::ser_date::ser_date,
 	database::schemas::FancyPlayer,
-	serde::{Deserialize, Serialize},
+	serde::Serialize,
 	sqlx::{types::time::PrimitiveDateTime, FromRow},
 };
 
@@ -43,7 +44,7 @@ pub struct RecordQuery {
 	pub created_on: PrimitiveDateTime,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Record {
 	pub id: u32,
 	pub map_name: String,
@@ -53,5 +54,6 @@ pub struct Record {
 	pub server_name: String,
 	pub time: f64,
 	pub teleports: u32,
-	pub created_on: String,
+	#[serde(serialize_with = "ser_date")]
+	pub created_on: PrimitiveDateTime,
 }

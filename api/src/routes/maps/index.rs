@@ -159,8 +159,8 @@ pub(crate) async fn get(
 				approver_name: map_row.approver_name,
 				approver_steam_id64: account_id_to_steam_id64(map_row.approved_by).to_string(),
 				filesize: map_row.filesize.to_string(),
-				created_on: map_row.created_on.to_string(),
-				updated_on: map_row.updated_on.to_string(),
+				created_on: map_row.created_on,
+				updated_on: map_row.updated_on,
 			})
 		})
 		.collect();

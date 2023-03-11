@@ -1,4 +1,4 @@
-use serde::Serialize;
+use {crate::ser_date::ser_date, serde::Serialize, sqlx::types::time::PrimitiveDateTime};
 
 mod ident;
 pub(crate) use ident::get as ident;
@@ -12,5 +12,6 @@ pub struct Mode {
 	pub name: String,
 	pub name_short: String,
 	pub name_long: String,
-	pub created_on: String,
+	#[serde(serialize_with = "ser_date")]
+	pub created_on: PrimitiveDateTime,
 }
