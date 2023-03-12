@@ -16,7 +16,7 @@ use {
 	},
 	log::info,
 	serde::{Deserialize, Serialize},
-	sqlx::mysql::MySqlPoolOptions,
+	sqlx::{mysql::MySqlPoolOptions, QueryBuilder},
 	std::{
 		path::PathBuf,
 		time::{Duration, Instant},
@@ -195,10 +195,21 @@ async fn main() -> Eyre<()> {
 				);
 
 				// If the player isn't in DB, insert them before inserting the record.
-				if database::crd::read::get_player(PlayerIdentifier::SteamID64(steam_id64), &pool)
-					.await
-					.is_err()
+				if let Ok(player) =
+					database::crd::read::get_player(PlayerIdentifier::SteamID64(steam_id64), &pool)
+						.await
 				{
+					if let Some(player_name) = record.player_name {
+						if player_name != player.name {
+							let mut query = QueryBuilder::new("UPDATE players SET name = ");
+							query
+								.push_bind(player_name)
+								.push(" WHERE id = ")
+								.push_bind(player.id);
+							query.build().execute(&pool).await?;
+						}
+					}
+				} else {
 					database::crd::create::insert_players(
 						&[(
 							player_id,
