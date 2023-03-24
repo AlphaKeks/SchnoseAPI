@@ -223,6 +223,23 @@ async fn main() -> Eyre<()> {
 					.await?;
 				}
 
+				if database::crd::read::get_server(record.server_id.to_string(), &pool)
+					.await
+					.is_err()
+				{
+					let server = GlobalAPI::get_server_by_id(record.server_id, &client).await?;
+					database::crd::create::insert_servers(
+						&[(
+							server.id as u16,
+							server.name,
+							steam_id64_to_account_id(server.owner_steamid64.parse()?)?,
+							0,
+						)],
+						&pool,
+					)
+					.await?;
+				}
+
 				database::crd::create::insert_records(
 					&[(
 						record_id, course_id, mode_id, player_id, server_id, time, teleports,

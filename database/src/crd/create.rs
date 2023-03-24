@@ -65,8 +65,6 @@ pub async fn insert_servers(servers: &[ServerData], pool: &Pool<MySql>) -> Eyre<
 		r#"
 		INSERT INTO servers
 		  (id, name, owned_by, approved_by)
-		VALUES
-		  (?, ?, ?, ?)
 		"#,
 	);
 	query
