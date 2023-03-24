@@ -4,25 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# error handling
 color-eyre = { workspace = true }
-
-# logging
 log = { workspace = true }
 env_logger = { workspace = true }
 
-# CLI
 clap = { workspace = true }
 
-# parsing
 serde = { workspace = true }
-serde_json = { workspace = true }
+chrono = { workspace = true }
 
-# time
-chrono = "0.4"
-
-# GOKZ
 gokz_rs = { workspace = true }
 
-# sql
 sqlx = { workspace = true }
