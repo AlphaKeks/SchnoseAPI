@@ -1,17 +1,4 @@
 [workspace]
-members = [
-	"crates/elastic_fetching",
-	"crates/global_api_fetching",
-	"crates/global_api_scraper",
-	"crates/migrations",
-	"scripts/split_json_records",
-	"scripts/filter_json",
-	"scripts/fetch_maps",
-	"scripts/record_scraper",
-	"scripts/ban_scraper",
-	"database",
-	"api",
-]
 
 [workspace.dependencies]
 # error handling
@@ -33,7 +20,6 @@ toml = "0.5"
 chrono = "0.4"
 
 # GOKZ
-gokz_rs = "0.15"
 
 # async runtime
 tokio = { version = "1", features = ["full"] }
