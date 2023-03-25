@@ -40,6 +40,8 @@ pub struct GlobalState {
 
 mod routes;
 
+pub use backend::{DatabaseError, Error};
+
 #[tokio::main]
 async fn main() -> Result<()> {
 	color_eyre::install()?;
@@ -78,6 +80,8 @@ async fn main() -> Result<()> {
 
 	let router = Router::new()
 		.route("/", get(|| async { "(͡ ͡° ͜ つ ͡͡°)" }))
+		.route("/api/players", get(routes::players::get_index))
+		.route("/api/players/", get(routes::players::get_index))
 		.route("/api/players/:identifier", get(routes::players::get_by_identifier))
 		.with_state(global_state);
 

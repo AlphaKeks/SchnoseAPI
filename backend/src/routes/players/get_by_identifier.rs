@@ -4,17 +4,19 @@ use {
 		extract::{Path, State},
 		Json,
 	},
-	backend::models::players::{PlayerResponse, PlayerRow},
+	backend::{
+		models::players::{PlayerResponse, PlayerRow},
+		Response,
+	},
 	gokz_rs::PlayerIdentifier,
 	log::debug,
 	tokio::time::Instant,
 };
 
-#[axum::debug_handler]
 pub async fn get_by_identifier(
 	Path(player_identifier): Path<PlayerIdentifier>,
 	State(global_state): State<GlobalState>,
-) -> backend::Response<PlayerResponse> {
+) -> Response<PlayerResponse> {
 	let took = Instant::now();
 	debug!("[players::get_by_identifier]");
 	debug!("> `player_identifier`: {player_identifier:#?}");
@@ -37,7 +39,7 @@ pub async fn get_by_identifier(
 		WHERE player.id = {}
 		LIMIT 1
 		"#,
-		dbg!(player).id,
+		player.id,
 	))
 	.fetch_one(&global_state.conn)
 	.await?;

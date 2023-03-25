@@ -1,8 +1,15 @@
 use {
 	gokz_rs::SteamID,
-	serde::Serialize,
+	serde::{Deserialize, Serialize},
 	sqlx::{types::Decimal, FromRow},
 };
+
+#[derive(Debug, Deserialize)]
+pub struct PlayerParams {
+	pub is_banned: Option<bool>,
+	pub limit: Option<u32>,
+	pub offset: Option<i32>,
+}
 
 #[derive(Debug, Serialize)]
 pub struct PlayerResponse {
