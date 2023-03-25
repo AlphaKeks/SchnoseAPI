@@ -86,6 +86,9 @@ async fn main() -> Result<()> {
 		.route("/api/players", get(routes::players::get_index))
 		.route("/api/players/", get(routes::players::get_index))
 		.route("/api/players/:identifier", get(routes::players::get_by_identifier))
+		.route("/api/modes", get(routes::modes::get_index))
+		.route("/api/modes/", get(routes::modes::get_index))
+		.route("/api/modes/:identifier", get(routes::modes::get_by_identifier))
 		.with_state(global_state);
 
 	Server::bind(&addr)
