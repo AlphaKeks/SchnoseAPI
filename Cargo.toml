@@ -21,7 +21,7 @@ toml = "0.5"
 chrono = "0.4"
 
 # GOKZ
-gokz_rs = "0.17"
+gokz_rs = { version = "0.17", features = ["global_api", "kzgo_api"] }
 
 # async runtime
 tokio = { version = "1", features = ["full"] }

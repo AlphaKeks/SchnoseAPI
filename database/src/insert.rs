@@ -25,6 +25,8 @@ pub async fn modes(rows: &[ModeRow], pool: &Pool<MySql>) -> Result<()> {
 		query.reset();
 	}
 
+	transaction.commit().await?;
+
 	Ok(())
 }
 
@@ -47,6 +49,8 @@ pub async fn players(rows: &[PlayerRow], pool: &Pool<MySql>) -> Result<()> {
 		query.build().execute(&mut transaction).await?;
 		query.reset();
 	}
+
+	transaction.commit().await?;
 
 	Ok(())
 }
@@ -79,6 +83,8 @@ pub async fn courses(rows: &[CourseRow], pool: &Pool<MySql>) -> Result<()> {
 		query.reset();
 	}
 
+	transaction.commit().await?;
+
 	Ok(())
 }
 
@@ -110,6 +116,8 @@ pub async fn maps(rows: &[MapRow], pool: &Pool<MySql>) -> Result<()> {
 		query.reset();
 	}
 
+	transaction.commit().await?;
+
 	Ok(())
 }
 
@@ -135,6 +143,8 @@ pub async fn servers(rows: &[ServerRow], pool: &Pool<MySql>) -> Result<()> {
 		query.build().execute(&mut transaction).await?;
 		query.reset();
 	}
+
+	transaction.commit().await?;
 
 	Ok(())
 }
@@ -165,6 +175,8 @@ pub async fn records(rows: &[RecordRow], pool: &Pool<MySql>) -> Result<()> {
 		query.build().execute(&mut transaction).await?;
 		query.reset();
 	}
+
+	transaction.commit().await?;
 
 	Ok(())
 }

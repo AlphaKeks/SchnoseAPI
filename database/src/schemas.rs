@@ -1,7 +1,10 @@
 use {
 	crate::serialize_date,
 	serde::Serialize,
-	sqlx::{types::time::PrimitiveDateTime, FromRow},
+	sqlx::{
+		types::chrono::{DateTime, Utc},
+		FromRow,
+	},
 };
 
 #[derive(Debug, FromRow, Serialize)]
@@ -9,7 +12,7 @@ pub struct ModeRow {
 	pub id: u8,
 	pub name: String,
 	#[serde(serialize_with = "serialize_date")]
-	pub created_on: PrimitiveDateTime,
+	pub created_on: DateTime<Utc>,
 }
 
 #[derive(Debug, FromRow, Serialize)]
@@ -42,9 +45,9 @@ pub struct MapRow {
 	pub created_by: u32,
 	pub approved_by: u32,
 	#[serde(serialize_with = "serialize_date")]
-	pub created_on: PrimitiveDateTime,
+	pub created_on: DateTime<Utc>,
 	#[serde(serialize_with = "serialize_date")]
-	pub updated_on: PrimitiveDateTime,
+	pub updated_on: DateTime<Utc>,
 }
 
 #[derive(Debug, FromRow, Serialize)]
@@ -65,5 +68,5 @@ pub struct RecordRow {
 	pub time: f64,
 	pub teleports: u32,
 	#[serde(serialize_with = "serialize_date")]
-	pub created_on: PrimitiveDateTime,
+	pub created_on: DateTime<Utc>,
 }
