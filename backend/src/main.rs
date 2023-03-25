@@ -1,3 +1,6 @@
+#![warn(clippy::style, clippy::complexity, clippy::cognitive_complexity)]
+#![deny(clippy::perf, clippy::correctness)]
+
 use {
 	axum::{routing::get, Router, Server},
 	clap::Parser,

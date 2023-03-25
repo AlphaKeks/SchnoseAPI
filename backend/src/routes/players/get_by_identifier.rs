@@ -21,7 +21,9 @@ pub async fn get_by_identifier(
 	debug!("[players::get_by_identifier]");
 	debug!("> `player_identifier`: {player_identifier:#?}");
 
-	let player = database::select::get_player(player_identifier, &global_state.conn).await?;
+	let player_id = database::select::get_player(player_identifier, &global_state.conn)
+		.await?
+		.id;
 
 	let result: PlayerRow = sqlx::query_as(&format!(
 		r#"
@@ -36,10 +38,9 @@ pub async fn get_by_identifier(
 		  SUM(record.mode_id = 202 AND record.teleports = 0) AS vnl_pro_completions
 		FROM players AS player
 		JOIN records AS record ON record.player_id = player.id
-		WHERE player.id = {}
+		WHERE player.id = {player_id}
 		LIMIT 1
-		"#,
-		player.id,
+		"#
 	))
 	.fetch_one(&global_state.conn)
 	.await?;
