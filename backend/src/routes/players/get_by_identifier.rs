@@ -6,7 +6,7 @@ use {
 	},
 	backend::{
 		models::players::{PlayerResponse, PlayerRow},
-		Response,
+		Response, ResponseBody,
 	},
 	gokz_rs::PlayerIdentifier,
 	log::debug,
@@ -46,7 +46,7 @@ pub async fn get_by_identifier(
 
 	debug!("Database result: {result:#?}");
 
-	Ok(Json(backend::ResponseBody {
+	Ok(Json(ResponseBody {
 		result: result.into(),
 		took: took.elapsed().as_nanos(),
 	}))

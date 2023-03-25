@@ -4,7 +4,7 @@ use {
 		extract::{Query, State},
 		Json,
 	},
-	backend::{models::players::PlayerParams, Response},
+	backend::{models::players::PlayerParams, Response, ResponseBody},
 	database::schemas::PlayerRow,
 	log::debug,
 	sqlx::QueryBuilder,
@@ -48,7 +48,7 @@ pub async fn get_index(
 		});
 	}
 
-	Ok(Json(backend::ResponseBody {
+	Ok(Json(ResponseBody {
 		result: result
 			.into_iter()
 			.map(Into::into)
