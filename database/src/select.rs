@@ -1,9 +1,8 @@
 use {
 	crate::schemas::*,
-	color_eyre::Result,
 	gokz_rs::{MapIdentifier, Mode, PlayerIdentifier, ServerIdentifier},
 	log::{debug, info},
-	sqlx::{MySql, Pool, QueryBuilder},
+	sqlx::{MySql, Pool, QueryBuilder, Result},
 };
 
 pub async fn get_mode(mode: Mode, pool: &Pool<MySql>) -> Result<ModeRow> {
@@ -11,10 +10,10 @@ pub async fn get_mode(mode: Mode, pool: &Pool<MySql>) -> Result<ModeRow> {
 	let mut query = QueryBuilder::new("SELECT * FROM modes WHERE id = ");
 	query.push_bind(mode as u8);
 	debug!("Runnig query:\n{}", query.sql());
-	Ok(query
+	query
 		.build_query_as()
 		.fetch_one(pool)
-		.await?)
+		.await
 }
 
 pub async fn get_modes(limit: Option<u32>, pool: &Pool<MySql>) -> Result<Vec<ModeRow>> {
@@ -22,10 +21,10 @@ pub async fn get_modes(limit: Option<u32>, pool: &Pool<MySql>) -> Result<Vec<Mod
 	let mut query = QueryBuilder::new("SELECT * FROM modes LIMIT ");
 	query.push_bind(limit.unwrap_or(u32::MAX));
 	debug!("Runnig query:\n{}", query.sql());
-	Ok(query
+	query
 		.build_query_as()
 		.fetch_all(pool)
-		.await?)
+		.await
 }
 
 pub async fn get_player(player: PlayerIdentifier, pool: &Pool<MySql>) -> Result<PlayerRow> {
@@ -37,17 +36,16 @@ pub async fn get_player(player: PlayerIdentifier, pool: &Pool<MySql>) -> Result<
 			.push("id = ")
 			.push_bind(steam_id.as_id32()),
 		PlayerIdentifier::Name(player_name) => query
-			.push(r#"name LIKE "%"#)
-			.push_bind(player_name)
-			.push(r#"%""#),
+			.push(r#"name LIKE "#)
+			.push_bind(format!("%{player_name}%")),
 	};
 
 	debug!("Runnig query:\n{}", query.sql());
 
-	Ok(query
+	query
 		.build_query_as()
 		.fetch_one(pool)
-		.await?)
+		.await
 }
 
 pub async fn get_players(limit: Option<u32>, pool: &Pool<MySql>) -> Result<Vec<PlayerRow>> {
@@ -66,7 +64,7 @@ pub async fn get_players(limit: Option<u32>, pool: &Pool<MySql>) -> Result<Vec<P
 
 pub async fn get_course(course_id: u32, pool: &Pool<MySql>) -> Result<CourseRow> {
 	info!("Fetching course #{course_id} from DB.");
-	Ok(sqlx::query!("SELECT * FROM courses WHERE id = ?", course_id)
+	sqlx::query!("SELECT * FROM courses WHERE id = ?", course_id)
 		.fetch_one(pool)
 		.await
 		.map(|row| CourseRow {
@@ -79,7 +77,7 @@ pub async fn get_course(course_id: u32, pool: &Pool<MySql>) -> Result<CourseRow>
 			skz_difficulty: row.skz_difficulty,
 			vnl: row.vnl == 1,
 			vnl_difficulty: row.vnl_difficulty,
-		})?)
+		})
 }
 
 pub async fn get_course_by_map(map: MapIdentifier, pool: &Pool<MySql>) -> Result<CourseRow> {
@@ -98,10 +96,10 @@ pub async fn get_course_by_map(map: MapIdentifier, pool: &Pool<MySql>) -> Result
 
 	debug!("Runnig query:\n{}", query.sql());
 
-	Ok(query
+	query
 		.build_query_as()
 		.fetch_one(pool)
-		.await?)
+		.await
 }
 
 pub async fn get_courses(limit: Option<u32>, pool: &Pool<MySql>) -> Result<Vec<CourseRow>> {
@@ -138,10 +136,10 @@ pub async fn get_map(map: MapIdentifier, pool: &Pool<MySql>) -> Result<MapRow> {
 
 	debug!("Runnig query:\n{}", query.sql());
 
-	Ok(query
+	query
 		.build_query_as()
 		.fetch_one(pool)
-		.await?)
+		.await
 }
 
 pub async fn get_maps(limit: Option<u32>, pool: &Pool<MySql>) -> Result<Vec<MapRow>> {
@@ -149,10 +147,10 @@ pub async fn get_maps(limit: Option<u32>, pool: &Pool<MySql>) -> Result<Vec<MapR
 	let mut query = QueryBuilder::new("SELECT * FROM maps LIMIT ?");
 	query.push_bind(limit.unwrap_or(u32::MAX));
 	debug!("Runnig query:\n{}", query.sql());
-	Ok(query
+	query
 		.build_query_as::<MapRow>()
 		.fetch_all(pool)
-		.await?)
+		.await
 }
 
 pub async fn get_server(server: ServerIdentifier, pool: &Pool<MySql>) -> Result<ServerRow> {
@@ -169,19 +167,17 @@ pub async fn get_server(server: ServerIdentifier, pool: &Pool<MySql>) -> Result<
 
 	debug!("Runnig query:\n{}", query.sql());
 
-	Ok(query
+	query
 		.build_query_as()
 		.fetch_one(pool)
-		.await?)
+		.await
 }
 
 pub async fn get_servers(limit: Option<u32>, pool: &Pool<MySql>) -> Result<Vec<ServerRow>> {
 	info!("Fetching {limit:?} servers from DB.");
-	Ok(
-		sqlx::query_as!(ServerRow, "SELECT * FROM servers LIMIT ?", limit.unwrap_or(u32::MAX))
-			.fetch_all(pool)
-			.await?,
-	)
+	sqlx::query_as!(ServerRow, "SELECT * FROM servers LIMIT ?", limit.unwrap_or(u32::MAX))
+		.fetch_all(pool)
+		.await
 }
 
 pub async fn get_record(record_id: u32, pool: &Pool<MySql>) -> Result<RecordRow> {
@@ -189,8 +185,8 @@ pub async fn get_record(record_id: u32, pool: &Pool<MySql>) -> Result<RecordRow>
 	let mut query = QueryBuilder::new("SELECT * FROM records WHERE id = ");
 	query.push_bind(record_id);
 	debug!("Runnig query:\n{}", query.sql());
-	Ok(query
+	query
 		.build_query_as()
 		.fetch_one(pool)
-		.await?)
+		.await
 }

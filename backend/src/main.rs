@@ -38,6 +38,8 @@ pub struct GlobalState {
 	pub conn: Pool<MySql>,
 }
 
+mod routes;
+
 #[tokio::main]
 async fn main() -> Result<()> {
 	color_eyre::install()?;
@@ -48,12 +50,14 @@ async fn main() -> Result<()> {
 
 	std::env::set_var(
 		"RUST_LOG",
-		if let Some(ref log_level) = args.log_level {
+		if args.debug {
+			"DEBUG"
+		} else if let Some(ref log_level) = args.log_level {
 			log_level.as_str()
 		} else if let Some(ref log_level) = config.log_level {
 			log_level.as_str()
 		} else {
-			"backend=info"
+			"backend=INFO"
 		},
 	);
 	env_logger::init();
@@ -74,6 +78,7 @@ async fn main() -> Result<()> {
 
 	let router = Router::new()
 		.route("/", get(|| async { "(͡ ͡° ͜ つ ͡͡°)" }))
+		.route("/api/players/:identifier", get(routes::players::get_by_identifier))
 		.with_state(global_state);
 
 	Server::bind(&addr)
