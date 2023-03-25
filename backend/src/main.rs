@@ -73,7 +73,7 @@ async fn main() -> Result<()> {
 	let global_state = GlobalState { conn: pool };
 
 	let router = Router::new()
-		.route("/", get(|| async { "Hello, world!" }))
+		.route("/", get(|| async { "(͡ ͡° ͜ つ ͡͡°)" }))
 		.with_state(global_state);
 
 	Server::bind(&addr)
