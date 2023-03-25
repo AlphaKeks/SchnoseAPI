@@ -3,6 +3,23 @@ name = "backend"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+color-eyre = { workspace = true }
+
+log = { workspace = true }
+env_logger = { workspace = true }
+
+clap = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+
+gokz_rs = { workspace = true }
+
+tokio = { workspace = true }
+
+sqlx = { workspace = true }
+database = { path = "../database" }
+
+axum = { version = "0.6", features = ["macros"] }
