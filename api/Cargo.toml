@@ -36,3 +36,4 @@ database = { path = "../database" }
 axum = "0.6"
 axum-extra = "0.4"
 axum-macros = "0.3.4"
+tower = { version = "0.4", features = ["limit", "buffer"] }

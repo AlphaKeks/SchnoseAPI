@@ -1,11 +1,17 @@
 use {
-	axum::{routing::get, Router},
+	axum::{
+		error_handling::HandleErrorLayer,
+		http::StatusCode,
+		routing::{get, post},
+		BoxError, Router,
+	},
 	clap::Parser,
 	color_eyre::Result as Eyre,
 	log::{debug, info},
 	serde::{Deserialize, Serialize},
 	sqlx::{mysql::MySqlPoolOptions, MySql, Pool},
-	std::{net::SocketAddr, path::PathBuf},
+	std::{net::SocketAddr, path::PathBuf, time::Duration},
+	tower::{buffer::BufferLayer, limit::RateLimitLayer, ServiceBuilder},
 };
 
 mod ser_date;
@@ -76,6 +82,17 @@ async fn main() -> Eyre<()> {
 		.route("/api/records/top/map/:ident", get(routes::records::map))
 		// TODO: parameters?
 		.route("/api/records/place/:id", get(routes::records::place))
+		.route("/api/twitch_info", post(routes::twitch_info).layer(
+			ServiceBuilder::new().layer(HandleErrorLayer::new(|why: BoxError| async move {
+				(
+					StatusCode::TOO_MANY_REQUESTS,
+					why.to_string()
+				)
+			}))
+			.layer(BufferLayer::new(1024))
+			.layer(RateLimitLayer::new(5, Duration::from_secs(10)))
+		))
+		// .route("/api/twitch_info", post(routes::twitch_info))
 		.with_state(global_state);
 
 	axum::Server::bind(&addr)
