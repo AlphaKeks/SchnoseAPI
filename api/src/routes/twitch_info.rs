@@ -23,7 +23,7 @@ pub struct Info {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MapInfo {
 	pub name: String,
-	pub tier: u8,
+	pub tier: Option<u8>,
 }
 
 pub(crate) async fn post(
