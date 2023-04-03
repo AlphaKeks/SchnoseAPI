@@ -83,7 +83,7 @@ pub(crate) async fn post(
 			.ok()
 			.map(|mode| mode.api())),
 		map_name,
-		map_tier.map(|tier| tier as u8),
+		map_tier,
 		api_key.0
 	)
 	.execute(&pool)
