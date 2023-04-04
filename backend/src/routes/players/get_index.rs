@@ -4,10 +4,9 @@ use {
 		extract::{Query, State},
 		Json,
 	},
-	backend::{models::players::PlayerParams, Response, ResponseBody},
+	backend::{models::players::PlayerParams, Response},
 	database::schemas::PlayerRow,
 	sqlx::QueryBuilder,
-	tokio::time::Instant,
 	tracing::debug,
 };
 
@@ -15,7 +14,6 @@ pub async fn get_index(
 	Query(params): Query<PlayerParams>,
 	State(global_state): State<GlobalState>,
 ) -> Response<Vec<PlayerRow>> {
-	let took = Instant::now();
 	debug!("[players::get_index]");
 	debug!("> {params:#?}");
 
@@ -48,11 +46,5 @@ pub async fn get_index(
 		});
 	}
 
-	Ok(Json(ResponseBody {
-		result: result
-			.into_iter()
-			.map(Into::into)
-			.collect(),
-		took: took.elapsed().as_nanos(),
-	}))
+	Ok(Json(result))
 }

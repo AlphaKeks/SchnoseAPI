@@ -6,11 +6,10 @@ use {
 	},
 	backend::{
 		models::maps::{MapParams, MapResponse, MapRow},
-		Response, ResponseBody,
+		Response,
 	},
 	gokz_rs::PlayerIdentifier,
 	sqlx::QueryBuilder,
-	tokio::time::Instant,
 	tracing::debug,
 };
 
@@ -18,7 +17,6 @@ pub async fn get_index(
 	Query(params): Query<MapParams>,
 	State(global_state): State<GlobalState>,
 ) -> Response<Vec<MapResponse>> {
-	let took = Instant::now();
 	debug!("[maps::get_index]");
 	debug!("> {params:#?}");
 
@@ -144,8 +142,5 @@ pub async fn get_index(
 		});
 	}
 
-	Ok(Json(ResponseBody {
-		result,
-		took: took.elapsed().as_nanos(),
-	}))
+	Ok(Json(result))
 }

@@ -6,10 +6,9 @@ use {
 	},
 	backend::{
 		models::maps::{MapResponse, MapRow},
-		Response, ResponseBody,
+		Response,
 	},
 	gokz_rs::MapIdentifier,
-	tokio::time::Instant,
 	tracing::debug,
 };
 
@@ -17,7 +16,6 @@ pub async fn get_by_identifier(
 	Path(map_identifier): Path<MapIdentifier>,
 	State(global_state): State<GlobalState>,
 ) -> Response<MapResponse> {
-	let took = Instant::now();
 	debug!("[maps::get_by_identifier]");
 	debug!("> `map_identifier`: {map_identifier:#?}");
 
@@ -60,8 +58,5 @@ pub async fn get_by_identifier(
 
 	debug!("Database result: {result:#?}");
 
-	Ok(Json(ResponseBody {
-		result,
-		took: took.elapsed().as_nanos(),
-	}))
+	Ok(Json(result))
 }

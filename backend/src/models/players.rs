@@ -10,6 +10,27 @@ pub struct PlayerParams {
 	pub limit: Option<u32>,
 	pub offset: Option<i32>,
 }
+/// `players` table
+/// +-----------+------------------+------+-----+---------+-------+
+/// | Field     | Type             | Null | Key | Default | Extra |
+/// +-----------+------------------+------+-----+---------+-------+
+/// | id        | int(10) unsigned | NO   | PRI | NULL    |       |
+/// | name      | varchar(255)     | NO   | MUL | unknown |       |
+/// | is_banned | tinyint(1)       | NO   |     | 0       |       |
+/// +-----------+------------------+------+-----+---------+-------+
+#[derive(Debug, FromRow)]
+pub struct PlayerRow {
+	pub id: u32,
+	pub name: String,
+	pub is_banned: bool,
+	pub total_completions: i64,
+	pub kzt_tp_completions: Decimal,
+	pub kzt_pro_completions: Decimal,
+	pub skz_tp_completions: Decimal,
+	pub skz_pro_completions: Decimal,
+	pub vnl_tp_completions: Decimal,
+	pub vnl_pro_completions: Decimal,
+}
 
 #[derive(Debug, Serialize)]
 pub struct PlayerResponse {
@@ -31,20 +52,6 @@ pub struct RecordSummary {
 pub struct RecordCount {
 	pub tp: u32,
 	pub pro: u32,
-}
-
-#[derive(Debug, FromRow)]
-pub struct PlayerRow {
-	pub id: u32,
-	pub name: String,
-	pub is_banned: bool,
-	pub total_completions: i64,
-	pub kzt_tp_completions: Decimal,
-	pub kzt_pro_completions: Decimal,
-	pub skz_tp_completions: Decimal,
-	pub skz_pro_completions: Decimal,
-	pub vnl_tp_completions: Decimal,
-	pub vnl_pro_completions: Decimal,
 }
 
 impl From<PlayerRow> for PlayerResponse {

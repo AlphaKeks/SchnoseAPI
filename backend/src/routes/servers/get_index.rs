@@ -6,11 +6,10 @@ use {
 	},
 	backend::{
 		models::servers::{ServerParams, ServerResponse, ServerRow},
-		Response, ResponseBody,
+		Response,
 	},
 	gokz_rs::PlayerIdentifier,
 	sqlx::QueryBuilder,
-	tokio::time::Instant,
 	tracing::debug,
 };
 
@@ -18,7 +17,6 @@ pub async fn get_index(
 	Query(params): Query<ServerParams>,
 	State(global_state): State<GlobalState>,
 ) -> Response<Vec<ServerResponse>> {
-	let took = Instant::now();
 	debug!("[servers::get_index]");
 	debug!("> {params:#?}");
 
@@ -101,8 +99,5 @@ pub async fn get_index(
 		});
 	}
 
-	Ok(Json(ResponseBody {
-		result,
-		took: took.elapsed().as_nanos(),
-	}))
+	Ok(Json(result))
 }

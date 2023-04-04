@@ -6,10 +6,9 @@ use {
 	},
 	backend::{
 		models::servers::{ServerResponse, ServerRow},
-		Response, ResponseBody,
+		Response,
 	},
 	gokz_rs::ServerIdentifier,
-	tokio::time::Instant,
 	tracing::debug,
 };
 
@@ -17,7 +16,6 @@ pub async fn get_by_identifier(
 	Path(server_identifier): Path<ServerIdentifier>,
 	State(global_state): State<GlobalState>,
 ) -> Response<ServerResponse> {
-	let took = Instant::now();
 	debug!("[servers::get_by_identifier]");
 	debug!("> `server_identifier`: {server_identifier:#?}");
 
@@ -47,8 +45,5 @@ pub async fn get_by_identifier(
 
 	debug!("Database result: {result:#?}");
 
-	Ok(Json(ResponseBody {
-		result,
-		took: took.elapsed().as_nanos(),
-	}))
+	Ok(Json(result))
 }

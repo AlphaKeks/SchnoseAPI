@@ -12,6 +12,15 @@ pub struct ServerParams {
 	pub limit: Option<u32>,
 }
 
+/// `servers` table
+/// +-------------+----------------------+------+-----+---------+-------+
+/// | Field       | Type                 | Null | Key | Default | Extra |
+/// +-------------+----------------------+------+-----+---------+-------+
+/// | id          | smallint(5) unsigned | NO   | PRI | NULL    |       |
+/// | name        | varchar(255)         | NO   |     | NULL    |       |
+/// | owned_by    | int(10) unsigned     | NO   | MUL | NULL    |       |
+/// | approved_by | int(10) unsigned     | NO   | MUL | NULL    |       |
+/// +-------------+----------------------+------+-----+---------+-------+
 #[derive(Debug, Serialize, FromRow)]
 pub struct ServerRow {
 	pub id: u16,

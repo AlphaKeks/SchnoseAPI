@@ -6,10 +6,9 @@ use {
 	},
 	backend::{
 		models::players::{PlayerResponse, PlayerRow},
-		Response, ResponseBody,
+		Response,
 	},
 	gokz_rs::PlayerIdentifier,
-	tokio::time::Instant,
 	tracing::debug,
 };
 
@@ -17,7 +16,6 @@ pub async fn get_by_identifier(
 	Path(player_identifier): Path<PlayerIdentifier>,
 	State(global_state): State<GlobalState>,
 ) -> Response<PlayerResponse> {
-	let took = Instant::now();
 	debug!("[players::get_by_identifier]");
 	debug!("> `player_identifier`: {player_identifier:#?}");
 
@@ -47,8 +45,5 @@ pub async fn get_by_identifier(
 
 	debug!("Database result: {result:#?}");
 
-	Ok(Json(ResponseBody {
-		result: result.into(),
-		took: took.elapsed().as_nanos(),
-	}))
+	Ok(Json(result.into()))
 }

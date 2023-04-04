@@ -1,14 +1,12 @@
 use {
 	crate::{DatabaseError, Error, GlobalState},
 	axum::{extract::State, Json},
-	backend::{Response, ResponseBody},
+	backend::Response,
 	database::schemas::ModeRow,
-	tokio::time::Instant,
 	tracing::debug,
 };
 
 pub async fn get_index(State(global_state): State<GlobalState>) -> Response<Vec<ModeRow>> {
-	let took = Instant::now();
 	debug!("[modes::get_index]");
 
 	let result: Vec<ModeRow> = sqlx::query_as("SELECT * FROM modes")
@@ -23,8 +21,5 @@ pub async fn get_index(State(global_state): State<GlobalState>) -> Response<Vec<
 		});
 	}
 
-	Ok(Json(ResponseBody {
-		result,
-		took: took.elapsed().as_nanos(),
-	}))
+	Ok(Json(result))
 }

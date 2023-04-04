@@ -9,14 +9,7 @@ use {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Global return type for all handler functions
-pub type Response<T> = Result<Json<ResponseBody<T>>>;
-
-/// Global return type for all handler functions
-#[derive(Debug, Serialize)]
-pub struct ResponseBody<T> {
-	pub result: T,
-	pub took: u128,
-}
+pub type Response<T> = Result<Json<T>>;
 
 /// Global error type for all handler functions
 #[derive(Debug, Clone, Serialize)]

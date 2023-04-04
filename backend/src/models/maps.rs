@@ -25,6 +25,61 @@ pub struct MapParams {
 	pub limit: Option<u32>,
 }
 
+/// `maps` table
+/// +-------------+----------------------+------+-----+---------------------+-------+
+/// | Field       | Type                 | Null | Key | Default             | Extra |
+/// +-------------+----------------------+------+-----+---------------------+-------+
+/// | id          | smallint(5) unsigned | NO   | PRI | NULL                |       |
+/// | name        | varchar(255)         | NO   |     | NULL                |       |
+/// | courses     | tinyint(3) unsigned  | NO   |     | 1                   |       |
+/// | validated   | tinyint(1)           | NO   |     | 0                   |       |
+/// | filesize    | bigint(20) unsigned  | NO   |     | NULL                |       |
+/// | created_by  | int(10) unsigned     | NO   | MUL | NULL                |       |
+/// | approved_by | int(10) unsigned     | NO   | MUL | NULL                |       |
+/// | created_on  | datetime             | NO   |     | current_timestamp() |       |
+/// | updated_on  | datetime             | NO   |     | current_timestamp() |       |
+/// +-------------+----------------------+------+-----+---------------------+-------+
+#[derive(Debug, FromRow)]
+pub struct MapRow {
+	pub id: u16,
+	pub name: String,
+	pub json_courses: String,
+	pub validated: bool,
+	pub filesize: u64,
+	pub mapper_id: u32,
+	pub mapper_name: String,
+	pub approver_id: u32,
+	pub approver_name: String,
+	pub created_on: DateTime<Utc>,
+	pub updated_on: DateTime<Utc>,
+}
+
+/// `courses` table
+/// +----------------+----------------------+------+-----+---------+-------+
+/// | Field          | Type                 | Null | Key | Default | Extra |
+/// +----------------+----------------------+------+-----+---------+-------+
+/// | id             | int(10) unsigned     | NO   | PRI | NULL    |       |
+/// | map_id         | smallint(5) unsigned | NO   | MUL | NULL    |       |
+/// | stage          | tinyint(3) unsigned  | NO   |     | NULL    |       |
+/// | kzt            | tinyint(1)           | NO   |     | NULL    |       |
+/// | kzt_difficulty | tinyint(3) unsigned  | NO   |     | NULL    |       |
+/// | skz            | tinyint(1)           | NO   |     | NULL    |       |
+/// | skz_difficulty | tinyint(3) unsigned  | NO   |     | NULL    |       |
+/// | vnl            | tinyint(1)           | NO   |     | NULL    |       |
+/// | vnl_difficulty | tinyint(3) unsigned  | NO   |     | NULL    |       |
+/// +----------------+----------------------+------+-----+---------+-------+
+#[derive(Debug, FromRow, Serialize)]
+pub struct CourseRow {
+	pub id: u32,
+	pub stage: u8,
+	pub kzt: bool,
+	pub kzt_difficulty: Tier,
+	pub skz: bool,
+	pub skz_difficulty: Tier,
+	pub vnl: bool,
+	pub vnl_difficulty: Tier,
+}
+
 #[derive(Debug, Serialize)]
 pub struct MapResponse {
 	pub id: u16,
@@ -41,33 +96,6 @@ pub struct MapResponse {
 	pub created_on: DateTime<Utc>,
 	#[serde(serialize_with = "serialize_date")]
 	pub updated_on: DateTime<Utc>,
-}
-
-#[derive(Debug, FromRow)]
-pub struct MapRow {
-	pub id: u16,
-	pub name: String,
-	pub json_courses: String,
-	pub validated: bool,
-	pub filesize: u64,
-	pub mapper_id: u32,
-	pub mapper_name: String,
-	pub approver_id: u32,
-	pub approver_name: String,
-	pub created_on: DateTime<Utc>,
-	pub updated_on: DateTime<Utc>,
-}
-
-#[derive(Debug, FromRow, Serialize)]
-pub struct CourseRow {
-	pub id: u32,
-	pub stage: u8,
-	pub kzt: bool,
-	pub kzt_difficulty: Tier,
-	pub skz: bool,
-	pub skz_difficulty: Tier,
-	pub vnl: bool,
-	pub vnl_difficulty: Tier,
 }
 
 impl TryFrom<MapRow> for MapResponse {
