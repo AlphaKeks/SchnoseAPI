@@ -107,6 +107,8 @@ async fn main() -> Result<()> {
 		.route("/api/servers", get(routes::servers::get_index))
 		.route("/api/servers/", get(routes::servers::get_index))
 		.route("/api/servers/:identifier", get(routes::servers::get_by_identifier))
+		.route("/api/records", get(routes::records::get_index))
+		.route("/api/records/", get(routes::records::get_index))
 		.route("/api/records/:id", get(routes::records::get_by_id))
 		.with_state(global_state)
 		.layer(TraceLayer::new_for_http());

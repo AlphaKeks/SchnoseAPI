@@ -1,15 +1,25 @@
 use {
 	crate::{Error, Result},
 	chrono::{DateTime, Utc},
-	database::serialize_date,
-	gokz_rs::{Mode, SteamID},
-	serde::Serialize,
+	database::{deserialize_date_opt, serialize_date},
+	gokz_rs::{MapIdentifier, Mode, PlayerIdentifier, SteamID},
+	serde::{Deserialize, Serialize},
 	sqlx::FromRow,
 };
 
-// #[derive(Debug, Deserialize)]
-// pub struct RecordParams {
-// }
+#[derive(Debug, Deserialize)]
+pub struct RecordParams {
+	pub map: Option<MapIdentifier>,
+	pub stage: Option<u8>,
+	pub mode: Option<Mode>,
+	pub player: Option<PlayerIdentifier>,
+	pub has_teleports: Option<bool>,
+	#[serde(default, deserialize_with = "deserialize_date_opt")]
+	pub created_after: Option<DateTime<Utc>>,
+	#[serde(default, deserialize_with = "deserialize_date_opt")]
+	pub created_before: Option<DateTime<Utc>>,
+	pub limit: Option<u32>,
+}
 
 /// +------------+----------------------+------+-----+---------------------+-------+
 /// | Field      | Type                 | Null | Key | Default             | Extra |

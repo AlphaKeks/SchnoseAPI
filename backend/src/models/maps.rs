@@ -18,9 +18,9 @@ pub struct MapParams {
 	pub validated: Option<bool>,
 	pub mapper: Option<PlayerIdentifier>,
 	pub approver: Option<PlayerIdentifier>,
-	#[serde(deserialize_with = "deserialize_date_opt")]
+	#[serde(default, deserialize_with = "deserialize_date_opt")]
 	pub created_after: Option<DateTime<Utc>>,
-	#[serde(deserialize_with = "deserialize_date_opt")]
+	#[serde(default, deserialize_with = "deserialize_date_opt")]
 	pub created_before: Option<DateTime<Utc>>,
 	pub limit: Option<u32>,
 }
