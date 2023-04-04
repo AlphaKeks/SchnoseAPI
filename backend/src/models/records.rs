@@ -14,6 +14,7 @@ pub struct RecordParams {
 	pub mode: Option<Mode>,
 	pub player: Option<PlayerIdentifier>,
 	pub has_teleports: Option<bool>,
+	pub allow_bans: Option<bool>,
 	#[serde(default, deserialize_with = "deserialize_date_opt")]
 	pub created_after: Option<DateTime<Utc>>,
 	#[serde(default, deserialize_with = "deserialize_date_opt")]

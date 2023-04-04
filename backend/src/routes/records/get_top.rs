@@ -12,7 +12,7 @@ use {
 	tracing::debug,
 };
 
-pub async fn get_index(
+pub async fn get_top(
 	Query(params): Query<RecordParams>,
 	State(global_state): State<GlobalState>,
 ) -> Response<Vec<RecordResponse>> {
@@ -32,10 +32,14 @@ pub async fn get_index(
 		  record.time AS time,
 		  record.teleports AS teleports,
 		  record.created_on AS created_on
-		FROM records AS record
-		JOIN players AS player ON player.id = record.player_id
-		JOIN courses AS course ON course.id = record.course_id
-		JOIN maps AS map ON map.id = course.map_id
+		FROM (
+		  SELECT
+		    record.id,
+		    MIN(record.time) AS "time"
+		  FROM records AS record
+		  JOIN players AS player ON player.id = record.player_id
+		  JOIN courses AS course ON course.id = record.course_id
+		  JOIN maps AS map ON map.id = course.map_id
 		"#,
 	);
 
@@ -91,9 +95,13 @@ pub async fn get_index(
 			}
 		};
 
-		if !matches!(params.allow_bans, Some(true)) {
-			query.push(r#" AND player.is_banned = 0 "#);
-		}
+		clause = " AND ";
+	}
+
+	if !matches!(params.allow_bans, Some(true)) {
+		query
+			.push(clause)
+			.push(r#" player.is_banned = 0 "#);
 
 		clause = " AND ";
 	}
@@ -140,8 +148,20 @@ pub async fn get_index(
 		}
 	};
 
+	query.push(
+		r#"
+		  GROUP BY record.course_id, record.player_id, record.mode_id
+		) AS top_times
+		JOIN records AS record
+		  ON record.id = top_times.id
+		JOIN players AS player ON player.id = record.player_id
+		JOIN courses AS course ON course.id = record.course_id
+		JOIN maps AS map ON map.id = course.map_id
+		"#,
+	);
+
 	query
-		.push(r#" ORDER BY record.created_on DESC "#)
+		.push(r#" ORDER BY record.time "#)
 		.push(r#" LIMIT "#)
 		.push_bind(params.limit.unwrap_or(100).min(500));
 
