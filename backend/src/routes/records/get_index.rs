@@ -1,5 +1,5 @@
 use {
-	crate::GlobalState,
+	crate::{Error, GlobalState},
 	axum::{
 		extract::{Query, State},
 		Json,
@@ -123,7 +123,7 @@ pub async fn get_index(
 		}
 		(Some(created_after), Some(created_before)) => {
 			if created_before <= created_after {
-				todo!();
+				return Err(Error::InvalidDateBounds);
 			}
 
 			query

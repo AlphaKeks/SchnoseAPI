@@ -29,6 +29,9 @@ pub enum Error {
 
 	/// Failed to parse Json.
 	Json { message: Option<String> },
+
+	/// User provided date bounds that make no sense.
+	InvalidDateBounds,
 }
 
 /// The different kinds of database errors that can occurr.
@@ -61,6 +64,7 @@ impl Display for Error {
 					"Failed to parse Json."
 				}
 			}
+			Error::InvalidDateBounds => "Invalid date bounds.",
 		})
 	}
 }
