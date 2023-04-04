@@ -93,6 +93,8 @@ async fn main() -> Result<()> {
 
 	let router = Router::new()
 		.route("/", get(|| async { "(͡ ͡° ͜ つ ͡͡°)" }))
+		.route("/api", get(|| async { "(͡ ͡° ͜ つ ͡͡°)" }))
+		.route("/api/", get(|| async { "(͡ ͡° ͜ つ ͡͡°)" }))
 		.route("/api/players", get(routes::players::get_index))
 		.route("/api/players/", get(routes::players::get_index))
 		.route("/api/players/:identifier", get(routes::players::get_by_identifier))
@@ -102,6 +104,9 @@ async fn main() -> Result<()> {
 		.route("/api/maps", get(routes::maps::get_index))
 		.route("/api/maps/", get(routes::maps::get_index))
 		.route("/api/maps/:identifier", get(routes::maps::get_by_identifier))
+		.route("/api/servers", get(routes::servers::get_index))
+		.route("/api/servers/", get(routes::servers::get_index))
+		.route("/api/servers/:identifier", get(routes::servers::get_by_identifier))
 		.with_state(global_state)
 		.layer(TraceLayer::new_for_http());
 

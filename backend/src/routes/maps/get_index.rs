@@ -31,7 +31,7 @@ pub async fn get_index(
 	if let Some(name) = params.name {
 		query
 			.push(r#" WHERE map.name LIKE "#)
-			.push_bind(format!(r#""%{name}%""#));
+			.push_bind(format!(r#"%{name}%"#));
 		clause = " AND ";
 	}
 
@@ -91,7 +91,7 @@ pub async fn get_index(
 			PlayerIdentifier::Name(name) => {
 				query
 					.push(" mapper.name LIKE ")
-					.push_bind(format!(r#""%{name}%""#));
+					.push_bind(format!(r#"%{name}%"#));
 			}
 		};
 	}
@@ -107,7 +107,7 @@ pub async fn get_index(
 			PlayerIdentifier::Name(name) => {
 				query
 					.push(" approver.name LIKE ")
-					.push_bind(format!(r#""%{name}%""#));
+					.push_bind(format!(r#"%{name}%"#));
 			}
 		};
 	}
