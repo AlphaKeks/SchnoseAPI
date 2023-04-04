@@ -7,8 +7,8 @@ use {
 	backend::{Response, ResponseBody},
 	database::schemas::ModeRow,
 	gokz_rs::Mode,
-	log::debug,
 	tokio::time::Instant,
+	tracing::debug,
 };
 
 pub async fn get_by_identifier(

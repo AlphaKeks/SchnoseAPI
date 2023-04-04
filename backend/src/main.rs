@@ -4,11 +4,14 @@
 use {
 	axum::{routing::get, Router, Server},
 	clap::Parser,
-	color_eyre::Result,
-	log::{debug, info},
+	color_eyre::{eyre::eyre, Result},
 	serde::Deserialize,
 	sqlx::{mysql::MySqlPoolOptions, MySql, Pool},
 	std::{net::SocketAddr, path::PathBuf},
+	time::macros::format_description,
+	tower_http::trace::TraceLayer,
+	tracing::{debug, info, level_filters::LevelFilter},
+	tracing_subscriber::fmt::time::UtcTime,
 };
 
 #[derive(Debug, Parser)]
@@ -53,19 +56,26 @@ async fn main() -> Result<()> {
 	let config_file = std::fs::read_to_string(&args.config_path)?;
 	let config: Config = toml::from_str(&config_file)?;
 
-	std::env::set_var(
-		"RUST_LOG",
-		if args.debug {
-			"DEBUG"
+	tracing_subscriber::fmt()
+		.compact()
+		.with_line_number(true)
+		.with_timer(UtcTime::new(format_description!(
+			"[[[year]-[month]-[day] [hour]:[minute]:[second]]"
+		)))
+		.with_max_level(if args.debug {
+			LevelFilter::DEBUG
 		} else if let Some(ref log_level) = args.log_level {
-			log_level.as_str()
+			log_level
+				.parse()
+				.map_err(|_| eyre!("Log level is required!"))?
 		} else if let Some(ref log_level) = config.log_level {
-			log_level.as_str()
+			log_level
+				.parse()
+				.map_err(|_| eyre!("Log level is required!"))?
 		} else {
-			"backend=INFO"
-		},
-	);
-	env_logger::init();
+			LevelFilter::INFO
+		})
+		.init();
 
 	debug!("{args:#?}");
 
@@ -89,7 +99,11 @@ async fn main() -> Result<()> {
 		.route("/api/modes", get(routes::modes::get_index))
 		.route("/api/modes/", get(routes::modes::get_index))
 		.route("/api/modes/:identifier", get(routes::modes::get_by_identifier))
-		.with_state(global_state);
+		.route("/api/maps", get(routes::maps::get_index))
+		.route("/api/maps/", get(routes::maps::get_index))
+		.route("/api/maps/:identifier", get(routes::maps::get_by_identifier))
+		.with_state(global_state)
+		.layer(TraceLayer::new_for_http());
 
 	Server::bind(&addr)
 		.serve(router.into_make_service())

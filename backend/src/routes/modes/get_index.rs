@@ -3,8 +3,8 @@ use {
 	axum::{extract::State, Json},
 	backend::{Response, ResponseBody},
 	database::schemas::ModeRow,
-	log::debug,
 	tokio::time::Instant,
+	tracing::debug,
 };
 
 pub async fn get_index(State(global_state): State<GlobalState>) -> Response<Vec<ModeRow>> {

@@ -1,8 +1,8 @@
 use {
 	axum::{http::StatusCode, response::IntoResponse, Json},
-	log::error,
 	serde::Serialize,
 	std::fmt::Display,
+	tracing::error,
 };
 
 /// Global Result type for all handler functions
@@ -116,5 +116,12 @@ impl From<gokz_rs::Error> for Error {
 		Self::GOKZ {
 			message: value.to_string(),
 		}
+	}
+}
+
+impl From<serde_json::Error> for Error {
+	fn from(why: serde_json::Error) -> Self {
+		error!("Failed to parse Json: {why:#?}");
+		Self::Json { message: None }
 	}
 }

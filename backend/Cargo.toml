@@ -6,8 +6,9 @@ edition = "2021"
 [dependencies]
 color-eyre = { workspace = true }
 
-log = { workspace = true }
-env_logger = { workspace = true }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["time"] }
+time = "0.3"
 
 clap = { workspace = true }
 
@@ -24,3 +25,4 @@ sqlx = { workspace = true }
 database = { path = "../database" }
 
 axum = { version = "0.6", features = ["macros"] }
+tower-http = { version = "0.4", default-features = false, features = ["trace"] }

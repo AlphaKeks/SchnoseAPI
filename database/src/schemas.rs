@@ -1,6 +1,6 @@
 use {
-	crate::serialize_date,
-	serde::Serialize,
+	crate::{deserialize_bool, serialize_date},
+	serde::{Deserialize, Serialize},
 	sqlx::{
 		types::chrono::{DateTime, Utc},
 		FromRow,
@@ -22,15 +22,18 @@ pub struct PlayerRow {
 	pub is_banned: bool,
 }
 
-#[derive(Debug, FromRow, Serialize)]
+#[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct CourseRow {
 	pub id: u32,
 	pub map_id: u16,
 	pub stage: u8,
+	#[serde(deserialize_with = "deserialize_bool")]
 	pub kzt: bool,
 	pub kzt_difficulty: u8,
+	#[serde(deserialize_with = "deserialize_bool")]
 	pub skz: bool,
 	pub skz_difficulty: u8,
+	#[serde(deserialize_with = "deserialize_bool")]
 	pub vnl: bool,
 	pub vnl_difficulty: u8,
 }

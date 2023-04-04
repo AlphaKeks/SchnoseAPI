@@ -9,8 +9,8 @@ use {
 		Response, ResponseBody,
 	},
 	gokz_rs::PlayerIdentifier,
-	log::debug,
 	tokio::time::Instant,
+	tracing::debug,
 };
 
 pub async fn get_by_identifier(

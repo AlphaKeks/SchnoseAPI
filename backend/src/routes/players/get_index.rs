@@ -6,9 +6,9 @@ use {
 	},
 	backend::{models::players::PlayerParams, Response, ResponseBody},
 	database::schemas::PlayerRow,
-	log::debug,
 	sqlx::QueryBuilder,
 	tokio::time::Instant,
+	tracing::debug,
 };
 
 pub async fn get_index(
